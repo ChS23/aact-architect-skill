@@ -1,6 +1,6 @@
 ---
 name: aact-architect
-description: Design and review microservice architectures using the aact pattern catalog. Use this skill when the user is sketching a C4 system in PlantUML or Structurizr, writing or reviewing an architecture decision record (ADR), choosing how to tag containers (acl, repo, relay), explaining why an aact rule fired, or asking about microservice patterns like ACL, CRUD-services, Database-per-service, API Gateway, Cohesion vs Coupling, Stable Dependencies, Common Reuse, or Acyclic Dependencies — even when the user does not explicitly mention "aact" or "C4". Bundles the canonical ADRs, an ADR template, starter architecture files, and a verify wrapper around `aact check`.
+description: Design, review, measure, and generate microservice architectures using the aact pattern catalog and CLI. Use this skill when the user is sketching a C4 system in PlantUML or Structurizr, writing or reviewing an ADR, choosing how to tag containers (acl, repo, relay), explaining why an aact rule fired, asking about microservice patterns (ACL, CRUD-services, Database-per-service, API Gateway, Cohesion vs Coupling, Stable Dependencies, Common Reuse, Acyclic Dependencies), looking at coupling/cohesion metrics for their services, or asking aact to emit PlantUML or Kubernetes manifests from their architecture — even when the user does not explicitly mention "aact" or "C4". Bundles the canonical ADRs, an ADR template, starter architecture files, and wrappers around `aact check / analyze / generate`.
 license: GPL-3.0 (skill code and bundled ADRs derive from Byndyusoft/aact, GPL-3.0)
 compatibility: Requires Node.js >= 20. The `aact` package is pinned to `^2.1.5` in scripts/verify.sh and auto-installed by `npx` on first run.
 metadata:
@@ -21,6 +21,8 @@ The skill keeps **all reasoning about patterns and ADRs in markdown** (loaded on
 - The user has a `.puml` or `workspace.json`/`workspace.dsl` and asks "is this OK?", "what's wrong here?", or "fix this".
 - The user asks what a specific aact rule means or why it fired.
 - The user is choosing tags or names for new containers.
+- The user asks about **coupling / cohesion / element counts** for their architecture, or wants to compare two versions quantitatively (this is `aact analyze`, workflow E).
+- The user wants **PlantUML emitted from a Structurizr workspace** (or vice versa), or **Kubernetes deployment YAMLs generated from the architectural model** as a starting point (this is `aact generate`, workflow F).
 
 ## Workflows
 
@@ -82,6 +84,40 @@ The skill keeps **all reasoning about patterns and ADRs in markdown** (loaded on
 
 User asks "what does crud mean" or "why did acl fire". Open the matching ADR/reference, summarise the *purpose* in one sentence, then quote the specific clause that the violation breaks.
 
+### E. Measuring coupling and cohesion
+
+When the user asks "what's our coupling?", "is this boundary cohesive enough?", or wants numbers to bring to a review:
+
+1. Run `npx aact@^2.1.5 analyze` from the project root. For machine-readable output (e.g. to diff between two versions), use `--format json`.
+2. The report includes:
+   - `elementsCount` — total containers in the model.
+   - `syncApiCalls`, `asyncApiCalls` — count of REST vs async edges.
+   - `databases.count` / `databases.consumes` — DB inventory + how many services touch them.
+   - `boundaries[]` — per boundary, its `cohesion` (intra-boundary relations) and `coupling` (cross-boundary outgoing relations), plus `couplingRelations[]` listing which specific edges leak across the boundary.
+3. Translate numbers into stakeholder language: rising coupling between two boundaries usually signals a missing seam (an ACL or API Gateway); cohesion below coupling on a boundary signals that the boundary is wrongly drawn — its contents probably belong to two different domains.
+4. Anchor every finding in the `Cohesion > Coupling` pattern (`references/patterns-catalog.md`) so the user understands *why* a number matters, not just *that* it's bigger than another.
+
+### F. Generating artifacts from the model
+
+`aact generate` turns the architecture model into downstream artifacts. Default `--format` is `plantuml`. Two formats today:
+
+**Plantuml** — emit a `.puml` from any source (Structurizr → PlantUML is a common need: the team works in Structurizr, but the wiki / handout expects PlantUML). Without `--output` the result is printed to stdout.
+```bash
+npx aact@^2.1.5 generate --format plantuml --output ./diagrams/architecture.puml
+```
+The boundary heading label in the output is configurable via `generate.boundaryLabel` in `aact.config.ts`.
+
+**Kubernetes** — emit one YAML stub per deployable container with environment-variable scaffolding for DB connections, REST `*_BASE_URL`, and Kafka topics (`KAFKA_<TARGET>_TOPIC` for `async`-tagged relations). Output is a directory of `.yml` files.
+```bash
+npx aact@^2.1.5 generate --format kubernetes --output ./k8s
+```
+Default output directory if `--output` is omitted: `resources/kubernetes/microservices` (configurable via `generate.kubernetes.path` in `aact.config.ts`).
+
+Things to tell the user before they run it:
+- Only `Container`-typed elements become deployment YAMLs. `System`, `Component`, `Person`, `ContainerDb`, and external systems are deliberately skipped — these are not deployable units.
+- The output is a **scaffold**, not production manifests. Image tags, resource requests, replicas, and secrets are not generated — the team fills them in.
+- The DB connection template defaults to PostgreSQL (`postgresql://{name}:pass-{name}@postgresql:5432/{name}`) and the service port to 8080. Both are CLI-fixed today — overriding them requires using the `generateKubernetes(model, options)` library API directly, not `aact.config.ts`.
+
 ## Rule → reference map
 
 | Rule | What it checks | Reference |
@@ -136,6 +172,17 @@ bash scripts/verify.sh           # plain check
 bash scripts/verify.sh --fix     # apply auto-fixes after preview
 bash scripts/verify.sh --dry-run # preview fixes without writing
 ```
+
+## Other aact commands at a glance
+
+| Command | Purpose | Common flags |
+|---------|---------|--------------|
+| `aact init` | Scaffold `aact.config.ts` + starter `architecture.puml`. | (no flags) |
+| `aact check` | Run all enabled rules against the source. | `--fix`, `--dry-run`, `--format text\|json\|github`, `--config <path>` |
+| `aact analyze` | Print coupling/cohesion metrics (workflow E). | `--format text\|json`, `--config <path>` |
+| `aact generate` | Emit PlantUML or Kubernetes from the model (workflow F). | `--format plantuml\|kubernetes`, `--output <path>`, `--config <path>` |
+
+`--format github` for `check` produces GitHub Actions annotations — useful when wiring aact into CI as a status check.
 
 ## Maintaining the skill
 
