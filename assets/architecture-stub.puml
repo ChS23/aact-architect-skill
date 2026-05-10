@@ -1,0 +1,23 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+' Starter architecture. Replace with your own system.
+' Tagging conventions used by aact rules:
+'   $tags="repo"  — service that owns a database (passes crud rule)
+'   $tags="acl"   — service wrapping an external integration (passes acl rule)
+'   $tags="async" on Rel(...) — async edge (Kafka/queue)
+
+System_Ext(payment_provider, "Payment Provider", "External REST API")
+
+System_Boundary(checkout, "Checkout") {
+  Container(orders, "Orders Service")
+  Container(orders_repo, "Orders Repo", "", "", $tags="repo")
+  ContainerDb(orders_db, "Orders DB", "PostgreSQL")
+  Container(payment_acl, "Payment ACL", "", "Wraps payment_provider", $tags="acl")
+
+  Rel(orders, orders_repo, "")
+  Rel(orders_repo, orders_db, "PostgreSQL")
+  Rel(orders, payment_acl, "REST")
+  Rel(payment_acl, payment_provider, "REST")
+}
+@enduml

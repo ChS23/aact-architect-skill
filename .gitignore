@@ -1,0 +1,6 @@
+# Workspace produced by skill-creator / eval runs lives as sibling, not inside.
+# These are just-in-case patterns for noise that can appear during local
+# experimentation.
+.DS_Store
+*.tmp
+*~

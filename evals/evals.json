@@ -1,0 +1,107 @@
+{
+  "skill_name": "aact-architect",
+  "_about": "Trigger-rate eval set per https://agentskills.io/skill-creation/optimizing-descriptions. 10 should-trigger + 10 should-not-trigger queries spanning the five activation contexts (designing, ADR-writing, reviewing, rule-explaining, tagging) and near-miss negatives (coding/CI/DB-ops with shared keywords). Run via skill-creator or a custom harness; suggested 3 runs per query, threshold 0.5.",
+  "evals": [
+    {
+      "id": "trigger-design-explicit",
+      "should_trigger": true,
+      "query": "Help me sketch a C4 container diagram for an e-commerce checkout — orders, payments, notifications, an external Stripe integration, and a Postgres for orders. PlantUML if possible."
+    },
+    {
+      "id": "trigger-design-implicit",
+      "should_trigger": true,
+      "query": "I want to map out a small order-pipeline: an HTTP-facing service, a queue worker, a write-only DB. What does that look like?"
+    },
+    {
+      "id": "trigger-adr-write",
+      "should_trigger": true,
+      "query": "Write me an ADR for the decision to put an Anti-corruption Layer in front of our legacy CRM instead of letting services call it directly."
+    },
+    {
+      "id": "trigger-adr-implicit",
+      "should_trigger": true,
+      "query": "We've decided to switch from direct DB access to a repo-per-service pattern. Need to document this somewhere — the team wants a one-pager that captures the trade-off."
+    },
+    {
+      "id": "trigger-review-puml",
+      "should_trigger": true,
+      "query": "I have an architecture.puml in this folder. Can you check it's reasonable and suggest fixes?"
+    },
+    {
+      "id": "trigger-review-aact",
+      "should_trigger": true,
+      "query": "aact check is failing with 'orders directly accesses database orders_db — add a repo or relay'. Why and how do I fix it?"
+    },
+    {
+      "id": "trigger-explain-rule",
+      "should_trigger": true,
+      "query": "what does the crud rule actually mean? why does aact want a separate repo service?"
+    },
+    {
+      "id": "trigger-explain-cohesion",
+      "should_trigger": true,
+      "query": "explain cohesion vs coupling in the context of microservice boundaries — i need to understand whether our checkout boundary is too leaky"
+    },
+    {
+      "id": "trigger-tagging",
+      "should_trigger": true,
+      "query": "I'm adding a service that wraps SendGrid for transactional email. What tag should it have so the rules don't complain?"
+    },
+    {
+      "id": "trigger-multistep",
+      "should_trigger": true,
+      "query": "i'm doing the architecture review for q2 — got 5 microservices already in workspace.dsl, need to (1) walk through which patterns each follows, (2) write 2 ADRs for the decisions we made last quarter, (3) verify the whole thing is clean"
+    },
+
+    {
+      "id": "no-trigger-dockerfile",
+      "should_trigger": false,
+      "query": "Generate a Dockerfile for my Node.js microservice with a multi-stage build."
+    },
+    {
+      "id": "no-trigger-kubernetes-deploy",
+      "should_trigger": false,
+      "query": "what's the best way to roll out a microservice update to my Kubernetes cluster with zero downtime?"
+    },
+    {
+      "id": "no-trigger-coding-pattern",
+      "should_trigger": false,
+      "query": "Refactor this OrderProcessor class to use the Strategy pattern — too many if-else branches."
+    },
+    {
+      "id": "no-trigger-crud-tests",
+      "should_trigger": false,
+      "query": "Write unit tests for my CRUD endpoints — I have GET/POST/PUT/DELETE for /users and want jest tests covering happy path and 404s."
+    },
+    {
+      "id": "no-trigger-db-tuning",
+      "should_trigger": false,
+      "query": "How do I add a composite index on (user_id, created_at) to my Postgres orders table without locking it?"
+    },
+    {
+      "id": "no-trigger-react-review",
+      "should_trigger": false,
+      "query": "code review for this React component — i think there's a useEffect dependency bug"
+    },
+    {
+      "id": "no-trigger-ci-pipeline",
+      "should_trigger": false,
+      "query": "Set up a GitHub Actions workflow to run tests + lint on PRs for my microservices monorepo."
+    },
+    {
+      "id": "no-trigger-er-diagram",
+      "should_trigger": false,
+      "query": "Draw an ER diagram in Mermaid for our orders / customers / line_items tables."
+    },
+    {
+      "id": "no-trigger-architecture-doc",
+      "should_trigger": false,
+      "query": "Write a README section explaining the high-level architecture of my Express + React + Postgres app for new contributors."
+    },
+    {
+      "id": "no-trigger-debugging",
+      "should_trigger": false,
+      "query": "my orders microservice has a memory leak under load — heap grows from 200MB to 2GB over 30 minutes. how do i find the cause?"
+    }
+  ]
+}
