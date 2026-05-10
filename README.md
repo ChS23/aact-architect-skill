@@ -2,6 +2,8 @@
 
 A companion [Agent Skill](https://agentskills.io) for designing, documenting, and validating microservice architectures using the patterns from [Byndyusoft/aact](https://github.com/Byndyusoft/aact).
 
+The `aact` CLI and its pattern catalog are authored and maintained by **[Ruslan Safin (@razonrus)](https://github.com/razonrus)** at Byndyusoft. This skill packages those patterns and the bundled ADRs for use inside agent harnesses (Claude Code, Codex, Cursor, etc.). It is a derivative work under GPL-3.0.
+
 The skill keeps **all reasoning about patterns and ADRs in markdown** (loaded on demand) and **delegates verification to the deterministic `aact` CLI** (no LLM in the validation loop, no API keys baked in). The agent's job is to translate human intent into C4 + ADRs; aact's job is to check the result.
 
 ## What it bundles
@@ -66,6 +68,11 @@ cd ~/.agents/skills/aact-architect
 bash scripts/sync-from-aact.sh             # pull from main
 bash scripts/sync-from-aact.sh v2.2.0      # or pin a tag
 ```
+
+## Credits
+
+- **[Byndyusoft/aact](https://github.com/Byndyusoft/aact)** — the CLI, the rule engine, and the pattern catalog. Authored by [Ruslan Safin (@razonrus)](https://github.com/razonrus), with contributions from the Byndyusoft team and external contributors. The ADRs and `patterns.md` bundled into `references/` are theirs verbatim.
+- This skill (the `SKILL.md` workflows, the assets, the scripts, the eval set) was assembled by [Sergei Volchkov (@ChS23)](https://github.com/ChS23) as a companion to aact for agent-driven architectural work.
 
 ## License
 

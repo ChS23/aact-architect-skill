@@ -4,13 +4,14 @@ description: Design, review, measure, and generate microservice architectures us
 license: GPL-3.0 (skill code and bundled ADRs derive from Byndyusoft/aact, GPL-3.0)
 compatibility: Requires Node.js >= 20. The `aact` package is pinned to `^2.1.5` in scripts/verify.sh and auto-installed by `npx` on first run.
 metadata:
-  author: ChS23
+  author: Sergei Volchkov (https://github.com/ChS23)
   upstream: https://github.com/Byndyusoft/aact
+  upstream_author: Ruslan Safin (https://github.com/razonrus)
 ---
 
 # aact-architect
 
-A working companion for designing, documenting, and validating microservice architectures using the patterns catalogued in [Byndyusoft/aact](https://github.com/Byndyusoft/aact).
+A working companion for designing, documenting, and validating microservice architectures using the patterns catalogued in [Byndyusoft/aact](https://github.com/Byndyusoft/aact) by [Ruslan Safin (@razonrus)](https://github.com/razonrus).
 
 The skill keeps **all reasoning about patterns and ADRs in markdown** (loaded on demand) and **delegates verification to the deterministic `aact` CLI** (no LLM in the validation loop, no API keys baked in). The agent's job is to translate human intent into C4 + ADRs; aact's job is to check the result.
 
