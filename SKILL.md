@@ -1,8 +1,8 @@
 ---
 name: aact-architect
-description: Design, review, measure, and generate microservice architectures using the aact pattern catalog and CLI. Use this skill when the user is sketching a C4 system in PlantUML or Structurizr, writing or reviewing an ADR, choosing how to tag containers (acl, repo, relay), explaining why an aact rule fired, asking about microservice patterns (ACL, CRUD-services, Database-per-service, API Gateway, Cohesion vs Coupling, Stable Dependencies, Common Reuse, Acyclic Dependencies), looking at coupling/cohesion metrics for their services, or asking aact to emit PlantUML or Kubernetes manifests from their architecture — even when the user does not explicitly mention "aact" or "C4". Bundles the canonical ADRs, an ADR template, starter architecture files, and wrappers around `aact check / analyze / generate`.
+description: Design, review, measure, and generate microservice architectures using the aact pattern catalog and CLI. Use this skill when the user is sketching a C4 system in PlantUML or Structurizr, writing or reviewing an ADR, choosing how to tag containers (acl, repo, relay), writing project-specific compliance checks (custom rules in aact.config.ts), explaining why an aact rule fired, asking about microservice patterns (ACL, CRUD-services, Database-per-service, API Gateway, Cohesion vs Coupling, Stable Dependencies, Common Reuse, Acyclic Dependencies, Bounded Context isolation), looking at coupling/cohesion metrics for their services, or asking aact to emit PlantUML or Kubernetes manifests from their architecture — even when the user does not explicitly mention "aact" or "C4". Bundles the canonical ADRs, an ADR template, starter architecture files, a custom-rules authoring guide, and wrappers around `aact check / analyze / generate / rule list`.
 license: GPL-3.0 (skill code and bundled ADRs derive from Byndyusoft/aact, GPL-3.0)
-compatibility: Requires Node.js >= 20. The `aact` package is pinned to `^2.1.5` in scripts/verify.sh and auto-installed by `npx` on first run.
+compatibility: Requires Node.js >= 22. The `aact` package tracks the `beta` dist-tag (currently 3.0.0-beta.3) in scripts/verify.sh and is auto-installed by `npx` on first run. v3 brings typed Model API, `customRules` extension, `defineConfig` generics with autocomplete for custom rule options, and the `aact rule list` command — all backward-compatible at the PlantUML / Structurizr source level.
 metadata:
   author: Sergei Volchkov (https://github.com/ChS23)
   upstream: https://github.com/Byndyusoft/aact
@@ -89,7 +89,7 @@ User asks "what does crud mean" or "why did acl fire". Open the matching ADR/ref
 
 When the user asks "what's our coupling?", "is this boundary cohesive enough?", or wants numbers to bring to a review:
 
-1. Run `npx aact@^2.1.5 analyze` from the project root. For machine-readable output (e.g. to diff between two versions), use `--format json`.
+1. Run `npx aact@beta analyze` from the project root. For machine-readable output (e.g. to diff between two versions), use `--format json`.
 2. The report includes:
    - `elementsCount` — total containers in the model.
    - `syncApiCalls`, `asyncApiCalls` — count of REST vs async edges.
@@ -104,13 +104,13 @@ When the user asks "what's our coupling?", "is this boundary cohesive enough?", 
 
 **Plantuml** — emit a `.puml` from any source (Structurizr → PlantUML is a common need: the team works in Structurizr, but the wiki / handout expects PlantUML). Without `--output` the result is printed to stdout.
 ```bash
-npx aact@^2.1.5 generate --format plantuml --output ./diagrams/architecture.puml
+npx aact@beta generate --format plantuml --output ./diagrams/architecture.puml
 ```
 The boundary heading label in the output is configurable via `generate.boundaryLabel` in `aact.config.ts`.
 
 **Kubernetes** — emit one YAML stub per deployable container with environment-variable scaffolding for DB connections, REST `*_BASE_URL`, and Kafka topics (`KAFKA_<TARGET>_TOPIC` for `async`-tagged relations). Output is a directory of `.yml` files.
 ```bash
-npx aact@^2.1.5 generate --format kubernetes --output ./k8s
+npx aact@beta generate --format kubernetes --output ./k8s
 ```
 Default output directory if `--output` is omitted: `resources/kubernetes/microservices` (configurable via `generate.kubernetes.path` in `aact.config.ts`).
 
@@ -118,6 +118,58 @@ Things to tell the user before they run it:
 - Only `Container`-typed elements become deployment YAMLs. `System`, `Component`, `Person`, `ContainerDb`, and external systems are deliberately skipped — these are not deployable units.
 - The output is a **scaffold**, not production manifests. Image tags, resource requests, replicas, and secrets are not generated — the team fills them in.
 - The DB connection template defaults to PostgreSQL (`postgresql://{name}:pass-{name}@postgresql:5432/{name}`) and the service port to 8080. Both are CLI-fixed today — overriding them requires using the `generateKubernetes(model, options)` library API directly, not `aact.config.ts`.
+
+### G. Writing project-specific (custom) rules
+
+When the built-in catalogue does not match a project's conventions — bounded-context isolation by tag prefix, mandatory ownership tags, internal compliance — write the rule alongside `aact.config.ts` instead of forking the package. Custom rules use the **same** `RuleDefinition` contract as built-ins and slot into the same `rules{}` block.
+
+1. **Decide if a built-in covers it first.** A custom rule should close a recurring review comment, not a hypothetical one. If a built-in does what you need with a different default — configure the built-in's options instead.
+2. **Write the rule in `./rules/<name>.ts`.** One file per rule. Use `defineRule` so TypeScript preserves the literal `name` for downstream typing:
+
+   ```ts
+   import { defineRule, type Model } from "aact";
+
+   export interface BcIsolationOptions {
+     readonly bcTagPrefix?: string;
+     readonly apiSuffix?: string;
+   }
+
+   export const bcIsolationRule = defineRule({
+     name: "bcIsolation",
+     description: "Cross-bounded-context calls must route through *_api or a broker",
+
+     check(model: Model, options?: BcIsolationOptions) {
+       const bcPrefix = options?.bcTagPrefix ?? "bc:";
+       const apiSuffix = options?.apiSuffix ?? "_api";
+       // ... return Violation[]
+       return [];
+     },
+   });
+   ```
+
+3. **Register + configure in `aact.config.ts`.** Switch from the `import type { AactConfig }` template to `defineConfig` so TypeScript autocompletes options for custom rules in `rules{}`:
+
+   ```ts
+   import { defineConfig } from "aact";
+   import { bcIsolationRule } from "./rules/bcIsolation";
+
+   export default defineConfig({
+     source: "./architecture.puml",
+
+     customRules: [bcIsolationRule], // auto-enabled
+
+     rules: {
+       acl: true,
+       bcIsolation: { bcTagPrefix: "bc:", apiSuffix: "_api" }, // autocompleted
+     },
+   });
+   ```
+
+4. **Conflict policy.** A custom rule whose `name` matches a built-in or another custom rule is rejected at startup. Prefix names per project (`acmeBcIsolation`, `mermaidLegend`).
+5. **Optional `fix()`.** `check` is required; `fix` is optional. When provided, `aact check --fix` will offer auto-correction. See the built-in `acl` (`src/rules/acl.ts` in the upstream repo) for a worked example — it injects a new ACL container and rewires violating relations through it.
+6. **List the effective set** any time with `npx aact@beta rule list` — built-in + custom together with enabled state. Use `--json` for tooling.
+
+Read `references/Writing custom rules.md` for the full pattern guide (when to write, anatomy, registration, options inference, fix capability, testing).
 
 ## Rule → reference map
 
@@ -131,6 +183,7 @@ Things to tell the user before they run it:
 | `acyclic` | Dependency graph has no cycles | `references/patterns-catalog.md` (see "Acyclic Dependencies") |
 | `cohesion` | Boundary's intra-cohesion exceeds its outward coupling | `references/patterns-catalog.md` (see "Cohesion > Coupling") |
 | `stableDependencies` | Dependencies point toward more stable components | `references/patterns-catalog.md` (see "Stable Dependencies") |
+| _(project-specific)_ | Custom rules registered via `customRules` in `aact.config.ts` | `references/Writing custom rules.md` |
 
 ## Tagging cheat sheet
 
@@ -163,7 +216,7 @@ When `aact check` reports a violation:
 
 ## Verifying
 
-Run `scripts/verify.sh` from the project root. It is a thin wrapper around `npx aact@^2.1.5 check` that:
+Run `scripts/verify.sh` from the project root. It is a thin wrapper around `npx aact@beta check` that:
 - Uses the project's `aact.config.ts` if present.
 - Falls back to creating one via `npx aact init` (with confirmation) if missing.
 - Relays exit code so it can be used in CI.
@@ -182,6 +235,7 @@ bash scripts/verify.sh --dry-run # preview fixes without writing
 | `aact check` | Run all enabled rules against the source. | `--fix`, `--dry-run`, `--format text\|json\|github`, `--config <path>` |
 | `aact analyze` | Print coupling/cohesion metrics (workflow E). | `--format text\|json`, `--config <path>` |
 | `aact generate` | Emit PlantUML or Kubernetes from the model (workflow F). | `--format plantuml\|kubernetes`, `--output <path>`, `--config <path>` |
+| `aact rule list` | List the effective rule set (built-in + custom, enabled state). | `--json` |
 
 `--format github` for `check` produces GitHub Actions annotations — useful when wiring aact into CI as a status check.
 

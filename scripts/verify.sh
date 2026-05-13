@@ -32,7 +32,8 @@ if ! command -v npx >/dev/null 2>&1; then
   exit 2
 fi
 
-# Pin to a known-good aact major+minor. Patch updates are picked up
-# automatically; major bumps are not, since they may rename rules or
-# change the auto-fix surface that this skill's instructions assume.
-exec npx aact@^2.1.5 check "$@"
+# Track the `beta` dist-tag — currently 3.0.0-beta.3, includes customRules
+# extension point, defineConfig generic, and `aact rule list`. Sergei (Сергей
+# Волчков, skill author) is sole npm owner of `aact`; the tag stays pinned to
+# the latest stable beta until v3 cuts.
+exec npx aact@beta check "$@"

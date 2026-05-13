@@ -11,7 +11,7 @@ The skill keeps **all reasoning about patterns and ADRs in markdown** (loaded on
 - The canonical [aact ADRs](https://github.com/Byndyusoft/aact/tree/main/ADRs) (Anti-corruption Layer, Database per CRUD-service, Common Reuse Principle, Target Architecture) and the [patterns catalog](https://github.com/Byndyusoft/aact/blob/main/patterns.md) in `references/`.
 - An ADR template ready to fill.
 - Starter `architecture.puml` (C4-PlantUML) and `workspace.dsl` (Structurizr) stubs in `assets/`.
-- `scripts/verify.sh` — thin wrapper around `npx aact@^2.1.5 check` with friendly errors.
+- `scripts/verify.sh` — thin wrapper around `npx aact@beta check` with friendly errors.
 - `scripts/sync-from-aact.sh` — pulls fresh ADRs/patterns from upstream.
 - `evals/evals.json` — 20 trigger-rate queries (10 should-trigger / 10 should-not-trigger) for `description` optimization.
 
