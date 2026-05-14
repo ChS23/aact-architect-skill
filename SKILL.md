@@ -33,9 +33,10 @@ The skill keeps **all reasoning about patterns and ADRs in markdown** (loaded on
 2. Copy the matching stub into the user's working directory:
    - `assets/architecture-stub.puml` for PlantUML, save as `architecture.puml`.
    - `assets/workspace-stub.dsl` for Structurizr, save as `workspace.dsl`.
-3. Walk the user through their system, adding containers one by one. Apply the tagging conventions in the [Tagging cheat sheet](#tagging-cheat-sheet) below.
-4. Once the diagram has shape, run `scripts/verify.sh` (or `npx aact check` directly) from the working directory. If `aact.config.ts` is missing, run `npx aact init` first.
-5. Walk through any violations using [Interpreting violations](#interpreting-violations).
+3. **Before adding elements, get the C4 discipline right.** Read `references/C4 model.md` — it has the canonical definitions, a decision procedure for "is this a Container?", and the failure modes that produce plausible-but-wrong models (layers-as-containers, over-decomposition, one shared DB box, external systems modelled as internal). The worked examples in `assets/example-1-system-context.puml` / `example-2-container.puml` / `example-3-component.puml` show correct granularity at each level.
+4. Walk the user through their system, adding containers one by one — follow the minimum-viable-C4 procedure in `references/C4 model.md`. Apply the tagging conventions in the [Tagging cheat sheet](#tagging-cheat-sheet) below.
+5. Once the diagram has shape, run `scripts/verify.sh` (or `npx aact check` directly) from the working directory. If `aact.config.ts` is missing, run `npx aact init` first.
+6. Walk through any violations using [Interpreting violations](#interpreting-violations).
 
 ### B. Writing an ADR
 
@@ -208,6 +209,14 @@ When `aact check` reports a violation:
    - **Question the rule** if the architecture is intentionally violating it. The user may decide to disable the rule in `aact.config.ts` (e.g. `acl: false`). Make sure the user understands the trade-off — link the ADR.
 
 ## Gotchas
+
+C4 modeling — the three mistakes that produce plausible-but-wrong models (full list + decision procedure in `references/C4 model.md`):
+
+- **Layers are not Containers.** `controller` / `service` / `repository` run in one process — they are Components, not Containers. A Container is "a runtime boundary around code being executed or data being stored" — something separately runnable, or a data store.
+- **One shared "Database" box hides the coupling.** Each data store is its own Container (`ContainerDb`), owned by one service. Modelling a single DB everything points at defeats `dbPerService` and the whole point of the diagram.
+- **External systems are not your Containers.** Stripe, Auth0, a partner API — model them as external Software Systems (`System_Ext` / `external: true`), never as Containers inside your boundary.
+
+aact / tooling specifics:
 
 - `Stdlib_C4_Context` element type in PlantUML is `System` — those become `SYSTEM_TYPE` containers in the model. The Kubernetes generator whitelists `Container` only, so `System`, `Component`, `Person` and external systems are deliberately skipped — do not expect them in the YAML output.
 - `enrichTags` in the Structurizr loader is a naming heuristic: a container whose name contains "crud" gets a phantom `repo` tag automatically. If the user names a service `crud_processor` for unrelated reasons, override the inferred tag explicitly in their workspace.

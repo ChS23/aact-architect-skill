@@ -9,8 +9,10 @@ The skill keeps **all reasoning about patterns and ADRs in markdown** (loaded on
 ## What it bundles
 
 - The canonical [aact ADRs](https://github.com/Byndyusoft/aact/tree/main/ADRs) (Anti-corruption Layer, Database per CRUD-service, Common Reuse Principle, Target Architecture) and the [patterns catalog](https://github.com/Byndyusoft/aact/blob/main/patterns.md) in `references/`.
+- `references/C4 model.md` — C4 modeling discipline: canonical definitions ([c4model.com](https://c4model.com)), a "what is a Container?" decision procedure, the failure modes that produce plausible-but-wrong models, and a minimum-viable-C4 procedure.
+- `references/Writing custom rules.md` — how to author project-specific rules.
 - An ADR template ready to fill.
-- Starter `architecture.puml` (C4-PlantUML) and `workspace.dsl` (Structurizr) stubs in `assets/`.
+- Starter `architecture.puml` (C4-PlantUML) and `workspace.dsl` (Structurizr) stubs, plus the canonical Internet Banking System example at all three C4 levels (`example-1-system-context.puml` / `example-2-container.puml` / `example-3-component.puml`), in `assets/`.
 - `scripts/verify.sh` — thin wrapper around `npx aact@beta check` with friendly errors.
 - `scripts/sync-from-aact.sh` — pulls fresh ADRs/patterns from upstream.
 - `evals/evals.json` — 20 trigger-rate queries (10 should-trigger / 10 should-not-trigger) for `description` optimization.

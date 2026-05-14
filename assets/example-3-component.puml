@@ -1,0 +1,43 @@
+@startuml internet-banking-components
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+' ── Component level ───────────────────────────────────────────────────
+' Scope:    ONE container, zoomed in
+' Audience: developers of that container
+' Shows:    the components inside one container and how they collaborate.
+'
+' c4model.com guidance: "only create component diagrams if you feel they
+' add value." Most projects stop at the Container level. This file
+' decomposes a single container (API Application) for illustration.
+'
+' Note: all components here run in ONE process — they are NOT separately
+' deployable. That is the line between a Component and a Container.
+
+Container(spa, "Single-Page Application", "JavaScript, Angular")
+Container(mobile_app, "Mobile App", "Xamarin")
+ContainerDb(database, "Database", "Oracle")
+System_Ext(mainframe, "Mainframe Banking System")
+System_Ext(email, "E-mail System")
+
+Container_Boundary(api, "API Application") {
+    Component(signin, "Sign In Controller", "Spring MVC Rest Controller", "Allows users to sign in to the internet banking system")
+    Component(accounts, "Accounts Summary Controller", "Spring MVC Rest Controller", "Provides customers with a summary of their bank accounts")
+    Component(reset, "Reset Password Controller", "Spring MVC Rest Controller", "Allows users to reset their passwords with a single-use URL")
+    Component(security, "Security Component", "Spring Bean", "Provides functionality related to signing in, changing passwords, etc")
+    Component(mainframe_facade, "Mainframe Banking System Facade", "Spring Bean", "A facade onto the mainframe banking system")
+    Component(email_component, "E-mail Component", "Spring Bean", "Sends e-mails to users")
+}
+
+Rel(spa, signin, "Makes API calls to", "JSON/HTTPS")
+Rel(spa, accounts, "Makes API calls to", "JSON/HTTPS")
+Rel(spa, reset, "Makes API calls to", "JSON/HTTPS")
+Rel(mobile_app, signin, "Makes API calls to", "JSON/HTTPS")
+Rel(signin, security, "Uses")
+Rel(accounts, mainframe_facade, "Uses")
+Rel(reset, security, "Uses")
+Rel(reset, email_component, "Uses")
+Rel(security, database, "Reads from and writes to", "JDBC")
+Rel(mainframe_facade, mainframe, "Makes API calls to", "XML/HTTPS")
+Rel(email_component, email, "Sends e-mail using")
+
+@enduml

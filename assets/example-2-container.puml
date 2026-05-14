@@ -1,0 +1,37 @@
+@startuml internet-banking-containers
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+' ── Container level ───────────────────────────────────────────────────
+' Scope:    one software system, zoomed in
+' Audience: technical — architects, developers, ops
+' Shows:    the runnable units and data stores inside the system, the
+'           major technology choices, and how they communicate.
+'           Users and external systems stay as supporting context.
+'
+' Same canonical Internet Banking System, one level deeper than
+' example-1. Note: ~5 containers — a real system has a handful to ~20,
+' not 80. If you have more, you are modelling Components or Code.
+
+Person(customer, "Personal Banking Customer", "A customer of the bank")
+System_Ext(mainframe, "Mainframe Banking System", "Stores core banking information")
+System_Ext(email, "E-mail System", "The internal Microsoft Exchange system")
+
+System_Boundary(banking, "Internet Banking System") {
+    Container(web_app, "Web Application", "Java, Spring MVC", "Delivers the static content and the single-page application")
+    Container(spa, "Single-Page Application", "JavaScript, Angular", "Provides all the banking functionality to customers via their web browser")
+    Container(mobile_app, "Mobile App", "Xamarin", "Provides a limited subset of the banking functionality to customers")
+    Container(api, "API Application", "Java, Spring MVC", "Provides banking functionality via a JSON/HTTPS API")
+    ContainerDb(database, "Database", "Oracle", "Stores user registration information, hashed authentication credentials, access logs, etc")
+}
+
+Rel(customer, web_app, "Visits bigbank.com using", "HTTPS")
+Rel(customer, spa, "Views account balances and makes payments using")
+Rel(customer, mobile_app, "Views account balances and makes payments using")
+Rel(web_app, spa, "Delivers to the customer's web browser")
+Rel(spa, api, "Makes API calls to", "JSON/HTTPS")
+Rel(mobile_app, api, "Makes API calls to", "JSON/HTTPS")
+Rel(api, database, "Reads from and writes to", "JDBC")
+Rel(api, mainframe, "Makes API calls to", "XML/HTTPS")
+Rel(api, email, "Sends e-mail using", "SMTP")
+
+@enduml
