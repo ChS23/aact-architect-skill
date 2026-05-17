@@ -1,388 +1,265 @@
 # Целевая архитектура aact
 
+Status: актуализировано для v3 beta на 2026-05-17. Этот документ больше не
+описывает "будущее без CLI": CLI, Format API, custom rules и typed Model API уже
+есть. Остальные пункты ниже фиксируют текущее состояние и ближайшую целевую
+линию: source locations, JSON diagnostics и будущий `sync` режим.
+
 ## Контекст
 
-aact — OSS CLI-инструмент для автоматической проверки архитектуры по её описанию "as Code".
-Используется в реальных проектах. Распространяется как npm-пакет, запускается через `npx aact@beta`.
+aact — OSS CLI и библиотека для проверки архитектуры, описанной as code. В v3
+архитектура загружается из PlantUML C4 или Structurizr в единую Model, после
+чего над ней работают правила, анализатор, генераторы и auto-fix.
 
-Сейчас в репозитории смешаны: код фреймворка, примеры использования и юнит-тесты.
-Проверки паттернов захардкожены в тестах и не переиспользуемы.
-Нет CLI — автогенерация запускается через Jest.
+Основные пользовательские входы:
 
-Данный ADR фиксирует целевое состояние, к которому движемся.
+- `aact.config.ts` — источник архитектуры, правила, custom rules, generate
+  options.
+- PlantUML C4 (`.puml`) или Structurizr JSON/DSL-derived workspace.
+- Project-specific custom rules через `customRules`.
+
+Основные команды:
+
+| Команда | Назначение |
+| --- | --- |
+| `npx aact@beta init` | Создать `aact.config.ts` и starter `architecture.puml`. |
+| `npx aact@beta check` | Проверить правила, exit code 1 при нарушениях. |
+| `npx aact@beta check --fix` | Применить conservative auto-fixes, если формат поддерживает fix. |
+| `npx aact@beta analyze` | Посчитать architecture metrics: coupling, cohesion, API calls, DB usage. |
+| `npx aact@beta generate --format plantuml` | Сгенерировать PlantUML из Model. |
+| `npx aact@beta generate --format kubernetes` | Сгенерировать Kubernetes scaffold из Model. |
+| `npx aact@beta rule list` | Показать effective rule set: built-in + custom. |
+| `npx aact@beta skill` | Установить `aact-architect` skill для агентных workflow. |
 
 ## Принципы
 
-1. **Разделение фреймворка и примеров** — код инструмента и примеры использования живут отдельно
-2. **Правила настраиваемые** — пользователь конфигурирует теги, именования, соглашения
-3. **Форматы равноправны** — PlantUML, Structurizr и будущие форматы маппятся в единую модель
-4. **CLI — основной интерфейс** — `npx aact@beta` для генерации, анализа и проверок
-5. **Импортируемый API** — можно подключить как библиотеку в свои Vitest/Jest тесты
-6. **Современный стек** — ESM-first, актуальные версии инструментов
+1. **Model-first**: правила, анализ и генерация работают с единой Model, а не с
+   синтаксисом конкретного формата.
+2. **Format API**: каждый формат сам объявляет capabilities (`load`,
+   `generate`, `fix`). Добавление формата не должно требовать branching по всему
+   CLI.
+3. **CLI тонкий**: команды загружают config/model, вызывают core API и
+   форматируют результат.
+4. **Custom rules first**: проектные политики добавляются через
+   `customRules`, а не через fork пакета.
+5. **Conservative fixes**: `--fix` применяет только локально понятные правки.
+   Рискованные архитектурные решения должны оставаться diagnostics/hints.
+6. **Agent-friendly output**: JSON diagnostics и source locations должны быть
+   стабильным контрактом для AactLoop/coding-agent harness.
+7. **Load/generate/sync are different modes**:
+   - `load`: architecture source -> Model;
+   - `generate`: Model -> artifacts;
+   - future `sync`: Model + observed infra/code facts -> DriftReport/Patch.
 
-## Целевая структура репозитория
+## Текущее устройство репозитория
 
-```
+```text
 aact/
 ├── src/
-│   ├── model/                          # Единая доменная модель
-│   │   ├── container.ts                #   Контейнер (сервис, БД, внешняя система)
-│   │   ├── relation.ts                 #   Связь между контейнерами
-│   │   ├── boundary.ts                 #   Граница (контекст, подсистема)
-│   │   └── index.ts
-│   │
-│   ├── loaders/                        # Загрузчики форматов → model
-│   │   ├── plantuml/                   #   PlantUML C4 (.puml)
-│   │   │   ├── loadPlantumlElements.ts
-│   │   │   ├── mapContainersFromPlantumlElements.ts
-│   │   │   └── index.ts
-│   │   ├── structurizr/                #   Structurizr JSON (.json)
-│   │   │   ├── types.ts
-│   │   │   ├── loadStructurizrElements.ts
-│   │   │   └── index.ts
-│   │   ├── kubernetes/                 #   K8s YAML → deploy configs
-│   │   │   ├── loadMicroserviceDeployConfigs.ts
-│   │   │   ├── mapContainersFromDeployConfigs.ts
-│   │   │   └── index.ts
-│   │   └── index.ts                    #   Реэкспорт всех загрузчиков
-│   │
-│   ├── rules/                          # Переиспользуемые правила-проверки
-│   │   ├── acl.ts                      #   Anti-Corruption Layer
-│   │   ├── crud.ts                     #   Пассивные CRUD-сервисы
-│   │   ├── acyclic.ts                  #   Ациклические зависимости
-│   │   ├── dbPerService.ts             #   Database per Service
-│   │   ├── apiGateway.ts               #   API Gateway
-│   │   ├── cohesion.ts                 #   Связность > Связанность
-│   │   ├── stableDependencies.ts       #   Stable Dependencies Principle
-│   │   ├── commonReuse.ts              #   Common Reuse Principle
-│   │   └── index.ts                    #   Реэкспорт всех правил
-│   │
-│   ├── analyzer.ts                     # Метрики: cohesion, coupling, API calls
-│   │
-│   ├── cli/                            # CLI-интерфейс (npx aact@beta)
-│   │   ├── index.ts                    #   Точка входа (citty)
-│   │   └── commands/
-│   │       ├── generate.ts             #   aact generate — puml из конфигов
-│   │       ├── analyze.ts              #   aact analyze — метрики
-│   │       └── check.ts               #   aact check — запуск правил
-│   │
-│   └── index.ts                        # Публичный API пакета
-│
-├── test/                               # Юнит-тесты ФРЕЙМВОРКА
-│   ├── loaders/
-│   │   ├── plantuml.test.ts            #   Парсинг puml → model
-│   │   ├── structurizr.test.ts         #   Парсинг workspace.json → model
-│   │   └── kubernetes.test.ts          #   Парсинг YAML → deploy configs
-│   ├── rules/
-│   │   ├── acl.test.ts                 #   Правило ACL работает корректно
-│   │   ├── acyclic.test.ts             #   Правило ацикличности работает
-│   │   └── ...
-│   └── analyzer.test.ts
-│
-├── examples/                           # Примеры для пользователей
-│   ├── banking-plantuml/               #   Пример: PlantUML + K8s
-│   │   ├── resources/
-│   │   │   ├── C4L2.puml
-│   │   │   └── kubernetes/
-│   │   └── architecture.test.ts
-│   ├── microservices-structurizr/      #   Пример: Structurizr JSON
-│   │   ├── resources/
-│   │   │   └── workspace.json
-│   │   └── architecture.test.ts
-│   └── microservices-csharp/           #   Пример: C# тесты
-│       ├── resources/
-│       │   └── workspace.json
-│       └── ArchitectureTests/
-│
-├── ADRs/                               # Архитектурные решения
-│   ├── ADR template.md
-│   ├── Anti-corruption Layer.md
-│   ├── Database per CRUD-service.md
-│   ├── Target Architecture.md          #   ← этот документ
-│   └── ...                             #   ADR для каждого паттерна
-│
-├── examples/modular-monolith-csharp/   # Пример: модульный монолит на C#
-│
-├── patterns.md                         # Каталог: паттерн → ADR → rule → example
-├── roadmap.md
-├── README.md
-└── package.json                        # bin: { "aact": "./src/cli/index.ts" }
+│   ├── model/                    # typed Model, buildModel, validateModel
+│   ├── formats/                  # Format API implementations
+│   │   ├── plantuml/             # load + generate + fix
+│   │   ├── structurizr/          # load + fix via source.writePath
+│   │   └── kubernetes/           # generate only
+│   ├── rules/                    # built-in rules + fix implementations
+│   ├── analyze.ts                # metrics over Model
+│   ├── cli/                      # citty commands
+│   │   ├── commands/
+│   │   │   ├── init.ts
+│   │   │   ├── check.ts
+│   │   │   ├── analyze.ts
+│   │   │   ├── generate.ts
+│   │   │   ├── rule.ts
+│   │   │   └── skill.ts
+│   │   ├── loadConfig.ts
+│   │   └── loadModel.ts
+│   ├── config.ts                 # AactConfigSchema + defineConfig
+│   └── index.ts                  # public library API
+├── test/                         # unit + CLI tests
+├── test/e2e/                     # built CLI subprocess tests
+├── examples/                     # realistic usage examples
+├── docs/                         # public docs
+├── ADRs/                         # architecture decisions / pattern docs
+├── patterns.md
+└── package.json
 ```
 
-## Ключевые архитектурные решения
+## Core API
 
-### 1. Единая модель (src/model/)
+### Model
 
-Все форматы (PlantUML, Structurizr, будущие) маппятся в единую модель:
+Model is the canonical architecture representation.
 
-```
-Container  ←→  Relation  ←→  Boundary
-```
-
-Правила и анализатор работают только с моделью. Они не знают про формат источника.
-
-### 2. Загрузчики как адаптеры (src/loaders/)
-
-Каждый загрузчик — функция с сигнатурой:
-
-```typescript
-(path: string, options?: LoaderOptions) => { containers: Container[], boundaries: Boundary[] }
+```ts
+export interface Model {
+  readonly containers: Readonly<Record<string, Container>>;
+  readonly boundaries: Readonly<Record<string, Boundary>>;
+}
 ```
 
-Это позволяет добавлять новые форматы без изменения ядра.
+Rules should depend on Model-level fields (`name`, `label`, `kind`,
+`external`, `tags`, `relations`, `properties`) instead of loader-specific
+syntax. Source-specific data belongs in `sourceLocation` / future source
+metadata, not in rule logic.
 
-Roadmap форматов:
+### Format API
 
-- ✅ PlantUML (.puml)
-- ✅ Structurizr JSON (.json)
-- ✅ Kubernetes YAML
-- 🟩 Structurizr DSL (.dsl)
-- 🟩 Docker Compose
-- 🟩 Mermaid C4
+Current contract:
 
-### 3. Конфигурация (c12 от UnJS)
+```ts
+export interface Format {
+  readonly name: string;
+  readonly defaultPattern?: string;
+  load?(path: string): Promise<LoadResult>;
+  generate?(model: Model): FormatOutput;
+  fix?: FixCapability;
+}
+```
 
-Конфиг загружается через [c12](https://github.com/unjs/c12) — поддерживает `.ts`, `.js`, `.json`, `.yaml`, `.toml` из коробки.
+Capabilities:
 
-Поиск конфига: `aact.config.ts` → `aact.config.js` → `.aactrc` → `.aactrc.json` → `.aactrc.yaml`.
+| Format | load | generate | fix |
+| --- | --- | --- | --- |
+| `plantuml` | yes | yes | yes |
+| `structurizr` | yes | no | yes, writes to `source.writePath` |
+| `kubernetes` | no | yes | no |
 
-```typescript
-// aact.config.ts — основной формат
+Important boundary: Kubernetes is currently a **generate target**, not an
+architecture source. Loading observed infra for drift detection should be a
+future `sync` capability/layer, not a normal Model loader.
+
+## Config and custom rules
+
+`aact.config.ts` is the main user-facing contract.
+
+```ts
 import { defineConfig } from "aact";
+import { bcIsolationRule } from "./rules/bcIsolation";
 
 export default defineConfig({
   source: {
-    type: "structurizr", // "plantuml" | "structurizr"
-    path: "./workspace.json",
+    type: "plantuml",
+    path: "./architecture.puml",
   },
+
+  customRules: [bcIsolationRule],
+
   rules: {
-    acl: { tag: "adapter" }, // кастомный тег вместо "acl"
-    acyclic: true, // true = дефолтный конфиг
-    dbPerService: true,
-    crud: { repoTag: "repository" },
+    acl: true,
+    crud: { repoTags: ["repo", "relay"] },
+    bcIsolation: { bcTagPrefix: "bc:", apiSuffix: "_api" },
   },
 });
 ```
 
-```yaml
-# .aactrc.yaml — для тех, кому удобнее YAML
-source:
-  type: structurizr
-  path: ./workspace.json
-rules:
-  acl:
-    tag: adapter
-  acyclic: true
-  dbPerService: true
+Custom rule policy:
+
+- `customRules` are auto-enabled.
+- Disable via `rules: { myRule: false }`.
+- Options use the same `rules{}` shape as built-ins.
+- Name conflicts with built-ins or another custom rule are rejected.
+- Prefer custom rules for project-specific architecture policies instead of
+  forking `aact`.
+
+## CLI output direction
+
+Current beta has mixed machine-output styles (`--format json` in some commands,
+`--json` in `rule list`). Target direction:
+
+```bash
+aact check [--json] [--fix] [--dry-run]
+aact analyze [--json]
+aact generate --format <plantuml|kubernetes> [--output <path>] [--json]
+aact rule list [--json]
+aact skill [--json]
 ```
 
-Возможности c12:
+Target machine-readable envelope:
 
-- **extends** — наследование конфигов: `extends: "github:Byndyusoft/aact-preset"`
-- **environment overrides** — разные правила для dev/prod
-- **watch mode** — перезапуск при изменении конфига
-
-### 4. Настраиваемые правила (src/rules/)
-
-Каждое правило — функция, принимающая модель и опциональный конфиг:
-
-```typescript
-// Использование в Jest/Vitest (импорт как библиотека)
-import { rules, loaders } from "aact";
-
-const model = loaders.structurizr("./workspace.json");
-rules.acl(model.containers); // дефолтный конфиг
-rules.acl(model.containers, { tag: "adapter" }); // кастомный тег
-```
-
-```typescript
-// Использование через CLI — конфиг берётся из aact.config.ts
-// npx aact@beta check
-```
-
-### 5. CLI как обёртка (src/cli/)
-
-CLI построен на [citty](https://github.com/unjs/citty) (UnJS) — минималистичный CLI-builder.
-
-CLI не содержит бизнес-логики. Он:
-
-- Загружает конфиг через c12
-- Вызывает загрузчик
-- Запускает правила/анализатор
-- Форматирует вывод
-
-Три команды:
-
-| Команда                           | Назначение                                   |
-| --------------------------------- | -------------------------------------------- |
-| `npx aact@beta generate --to plantuml` | Генерация диаграммы из IaC-конфигов          |
-| `npx aact@beta analyze`                | Вывод метрик (cohesion, coupling, API calls) |
-| `npx aact@beta check`                  | Запуск правил, exit code 1 при нарушении     |
-
-Стек CLI: **citty** (команды) + **c12** (конфиг) — оба из экосистемы UnJS, используются в Nuxt/Nitro.
-
-#### Форматы вывода `aact check`
-
-| Формат | Флаг                                                     | Назначение                             |
-| ------ | -------------------------------------------------------- | -------------------------------------- |
-| text   | по умолчанию                                             | Читаемый вывод в консоль через consola |
-| json   | `--format json`                                          | Машинный парсинг в CI-пайплайнах       |
-| github | `--format github` или автодетект по `GITHUB_ACTIONS` env | `::error` аннотации прямо в PR         |
-
-```
-$ npx aact@beta check
-✓ acl — passed
-✓ acyclic — passed
-✗ dbPerService — 2 violations
-  → "OrderService" accesses database of "UserService"
-  → "PaymentService" accesses database of "OrderService"
-
-2 rules passed, 1 failed (2 violations)
-```
-
-### 6. Разделение test/ и examples/
-
-| Каталог     | Назначение                                 | Запуск                         |
-| ----------- | ------------------------------------------ | ------------------------------ |
-| `test/`     | Проверяет корректность кода фреймворка     | `npm test` (CI)                |
-| `examples/` | Показывает как использовать aact в проекте | `npm run examples` или вручную |
-
-Пользователь копирует `examples/` к себе как отправную точку.
-
-### 7. Публичный API (src/index.ts)
-
-```typescript
-// src/index.ts — что экспортирует пакет
-export * from "./model";
-export * from "./loaders";
-export * from "./rules";
-export { analyze } from "./analyzer";
-```
-
-## Модернизация тулинга
-
-Текущий стек устарел. Целевое состояние:
-
-### Рантайм и язык
-
-| Было                         | Стало                              | Почему                |
-| ---------------------------- | ---------------------------------- | --------------------- |
-| `"node": ">=16"`             | `"node": ">=20"`                   | Node 16/18 EOL        |
-| `typescript: 5.1`            | `typescript: 5.7+`                 | Актуальный компилятор |
-| CJS (без `"type": "module"`) | **ESM-first** (`"type": "module"`) | Стандарт экосистемы   |
-| `tsconfig` extends `node16`  | extends `node20`                   | Актуальный таргет     |
-
-### Тестирование
-
-| Было              | Стало                    | Почему                                        |
-| ----------------- | ------------------------ | --------------------------------------------- |
-| Jest 29 + ts-jest | **Vitest**               | Нативный TS/ESM, быстрее, меньше конфигурации |
-| jest-extended     | Vitest built-in matchers | Vitest включает расширенные матчеры           |
-| `@types/jest`     | Не нужен                 | Vitest типизирован из коробки                 |
-
-### Линтинг и форматирование
-
-| Было                        | Стало                                            | Почему                              |
-| --------------------------- | ------------------------------------------------ | ----------------------------------- |
-| ESLint 8 + `.eslintrc.json` | **ESLint 9+** + `eslint.config.ts` (flat config) | ESLint 8 EOL, eslintrc удалён в v10 |
-| Prettier 2.7                | **Prettier 3.x**                                 | Актуальная версия                   |
-| commitlint 17               | commitlint 19+                                   | Актуальная версия                   |
-| husky 8                     | husky 9+                                         | Актуальная версия                   |
-| lint-staged 13              | lint-staged 15+                                  | Актуальная версия                   |
-
-### Сборка и публикация
-
-| Было                         | Стало                 | Почему                          |
-| ---------------------------- | --------------------- | ------------------------------- |
-| Нет сборки                   | **unbuild** (UnJS)    | Сборка ESM + CJS для npm-пакета |
-| `name: "ArchAsCode_Tests"`   | `name: "aact"`        | npm-publishable имя             |
-| `private: true`              | Убрать                | Для публикации как npm-пакет    |
-| `"dependencies": { "yarn" }` | Убрать                | yarn как dep — антипаттерн      |
-| Нет `exports`                | `"exports"` + `"bin"` | Точки входа для пакета и CLI    |
-
-### UnJS стек
-
-Консистентный набор инструментов из одной экосистемы:
-
-| Инструмент                                 | Назначение                                  |
-| ------------------------------------------ | ------------------------------------------- |
-| [c12](https://github.com/unjs/c12)         | Загрузка конфига (TS, JS, JSON, YAML, TOML) |
-| [citty](https://github.com/unjs/citty)     | CLI-builder                                 |
-| [unbuild](https://github.com/unjs/unbuild) | Сборка пакета (ESM + CJS)                   |
-| [jiti](https://github.com/unjs/jiti)       | TS-импорт в рантайме (используется c12)     |
-| [consola](https://github.com/unjs/consola) | Красивый вывод в консоль                    |
-
-### Package manager
-
-**pnpm** — для управления зависимостями репозитория. Не влияет на потребителей пакета — они используют любой менеджер (npm, pnpm, yarn, bun).
-
-Corepack для фиксации версии:
-
-```json
-{ "packageManager": "pnpm@9.x" }
-```
-
-### Целевой package.json (ключевые поля)
-
-```json
-{
-  "name": "aact",
-  "version": "2.0.0",
-  "type": "module",
-  "packageManager": "pnpm@9.15.4",
-  "exports": {
-    ".": {
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.cjs"
-    }
-  },
-  "bin": {
-    "aact": "./dist/cli.mjs"
-  },
-  "engines": {
-    "node": ">=20"
-  },
-  "scripts": {
-    "build": "unbuild",
-    "test": "vitest",
-    "lint": "eslint ."
-  }
+```ts
+interface AactCliResult<TData> {
+  schemaVersion: "aact.cli.v1";
+  command: string;
+  ok: boolean;
+  status: "success" | "failed" | "partial";
+  data: TData;
+  diagnostics: AactDiagnostic[];
+  summary?: Record<string, unknown>;
+  meta: {
+    aactVersion: string;
+    durationMs?: number;
+    configPath?: string;
+    source?: string;
+  };
 }
 ```
 
-## Релизы и публикация
+Rule diagnostics should eventually include:
 
-- **npm-имя**: `aact` (свободно в registry)
-- **Релизы**: [changesets](https://github.com/changesets/changesets) — PR-based, changelog генерируется автоматически
-- **Ветка трансформации**: `v2` — отдельная ветка, мержим в main когда всё готово
-- **feature/structurizr-support**: входит в v2 (не мержим отдельно в main)
+- stable issue code;
+- severity;
+- message;
+- source location;
+- affected element/relation;
+- fixability;
+- optional non-binding hints.
 
-## Документация
+`--fix` remains the switch that applies safe edits. Hints without `--fix` should
+be diagnostics, not a separate `suggest` command.
 
-- **README.md** — полный рерайт под новый API/CLI
-- **patterns.md** — каталог: паттерн → ADR → rule → example
-- **ADRs/** — по одному на каждый паттерн
-- **CONTRIBUTING.md** — гайд для контрибьюторов
+## Future sync mode
 
-## Связь с issues
+`sync` should compare intended architecture with observed implementation or
+infra state.
 
-| Issue | Что закрывает в этой архитектуре                                         |
-| ----- | ------------------------------------------------------------------------ |
-| #7    | `src/cli/` — CLI-утилита                                                 |
-| #8    | Исправление в `src/loaders/plantuml/`                                    |
-| #9    | `examples/microservices-structurizr/` + `examples/microservices-csharp/` |
-| #5    | `ADRs/` — по одному на каждый паттерн                                    |
-| #6    | `examples/` — тесты-примеры для каждого паттерна                         |
-| #10   | `src/rules/` — новые правила resilience, observability                   |
+```text
+load      -> architecture source -> Model
+generate  -> Model -> artifacts
+sync      -> runtime/infra source + Model -> DriftReport / Patch
+```
 
-## Порядок реализации
+Example future command:
 
-0. Модернизация тулинга (ESM, Vitest, ESLint 9, unbuild, Node >=20)
-1. Вынести правила в `src/rules/` с настраиваемым конфигом
-2. Исправить баг #8 (puml-ссылки)
-3. Создать CLI (`src/cli/`) на citty + c12
-4. Разделить `test/` и `examples/`
-5. Дописать ADR для паттернов
-6. Добавить примеры тестов для паттернов
-7. Пример Structurizr + C#
-8. Правила для отказоустойчивости и наблюдаемости
+```bash
+npx aact@beta sync \
+  --source ./architecture.puml \
+  --infra ./deploy/kubernetes \
+  --json
+```
+
+Why `sync` is separate from `load`:
+
+- Old Docker Compose can be an architecture source for migration.
+- Current Kubernetes can be observed runtime/deployment reality.
+- Comparing the two is a drift/conformance task, not just parsing another
+  architecture source.
+
+Potential drift diagnostics:
+
+- workload exists in Kubernetes but is missing from AaC;
+- Container exists in AaC but has no observed workload;
+- DB/resource exists in IaC with no modeled `ContainerDb`;
+- env var or service reference implies a missing relation;
+- Kafka topic implies missing async relation;
+- external endpoint implies missing ACL/external system relation.
+
+Safe `sync --fix` candidates:
+
+- add missing container/resource;
+- add missing relation when evidence is unambiguous;
+- add role tag (`repo`, `relay`, `acl`) when name and relation shape agree.
+
+Unsafe changes should stay as diagnostics/hints for human or agent review.
+
+## Parser direction
+
+Current limitations come mostly from third-party PlantUML parsing and lack of
+source locations. Target v3.x parser direction:
+
+- full Structurizr DSL parser/preserver for sync and source-preserving edits;
+- partial C4-PlantUML parser for C4 semantics;
+- non-C4 PlantUML syntax (`skinparam`, `note`, legends) handled as opaque or
+  silently skipped when it does not affect the Model;
+- parser recovery should return partial Model + issues instead of failing the
+  whole command when possible.
+
