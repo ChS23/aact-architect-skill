@@ -21,7 +21,7 @@ The skill keeps **all reasoning about patterns and ADRs in markdown** (loaded on
 
 Agent Skills format. Tested-as-loaded in Claude Code. Per [agentskills.io clients](https://agentskills.io/clients), the same format works in OpenAI Codex CLI, Cursor, GitHub Copilot, VS Code, Goose, OpenCode, Junie, and ~30 other agents.
 
-Runtime: requires Node.js ≥ 20 (for `npx aact`).
+Runtime: requires Node.js ≥ 22 (for `npx aact@beta`).
 
 ## Install
 
@@ -50,7 +50,7 @@ cd /tmp/some-fresh-dir
 #   "I have an architecture.puml — can you review it?"
 ```
 
-The skill should activate. It'll copy a stub from `assets/`, walk you through the system, and run `scripts/verify.sh` (which forwards to `npx aact check`).
+The skill should activate. It'll copy a stub from `assets/`, walk you through the system, and run `scripts/verify.sh` (which forwards to `npx aact@beta check`).
 
 ## Validate the skill
 

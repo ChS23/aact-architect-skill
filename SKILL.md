@@ -2,7 +2,7 @@
 name: aact-architect
 description: Design, review, measure, and generate microservice architectures using the aact pattern catalog and CLI. Use this skill when the user is sketching a C4 system in PlantUML or Structurizr, writing or reviewing an ADR, choosing how to tag containers (acl, repo, relay), writing project-specific compliance checks (custom rules in aact.config.ts), explaining why an aact rule fired, asking about microservice patterns (ACL, CRUD-services, Database-per-service, API Gateway, Cohesion vs Coupling, Stable Dependencies, Common Reuse, Acyclic Dependencies, Bounded Context isolation), looking at coupling/cohesion metrics for their services, or asking aact to emit PlantUML or Kubernetes manifests from their architecture — even when the user does not explicitly mention "aact" or "C4". Bundles the canonical ADRs, an ADR template, starter architecture files, a custom-rules authoring guide, and wrappers around `aact check / analyze / generate / rule list`.
 license: GPL-3.0 (skill code and bundled ADRs derive from Byndyusoft/aact, GPL-3.0)
-compatibility: Requires Node.js >= 22. The `aact` package tracks the `beta` dist-tag (currently 3.0.0-beta.3) in scripts/verify.sh and is auto-installed by `npx` on first run. v3 brings typed Model API, `customRules` extension, `defineConfig` generics with autocomplete for custom rule options, and the `aact rule list` command — all backward-compatible at the PlantUML / Structurizr source level.
+compatibility: Requires Node.js >= 22. The skill uses `aact@beta` via `npx` so it tracks the current v3 beta dist-tag instead of pinning a concrete beta version. v3 brings typed Model API, `customRules` extension, `defineConfig` generics with autocomplete for custom rule options, and the `aact rule list` command — all backward-compatible at the PlantUML / Structurizr source level.
 metadata:
   author: Sergei Volchkov (https://github.com/ChS23)
   upstream: https://github.com/Byndyusoft/aact
@@ -35,7 +35,7 @@ The skill keeps **all reasoning about patterns and ADRs in markdown** (loaded on
    - `assets/workspace-stub.dsl` for Structurizr, save as `workspace.dsl`.
 3. **Before adding elements, get the C4 discipline right.** Read `references/C4 model.md` — it has the canonical definitions, a decision procedure for "is this a Container?", and the failure modes that produce plausible-but-wrong models (layers-as-containers, over-decomposition, one shared DB box, external systems modelled as internal). The worked examples in `assets/example-1-system-context.puml` / `example-2-container.puml` / `example-3-component.puml` show correct granularity at each level.
 4. Walk the user through their system, adding containers one by one — follow the minimum-viable-C4 procedure in `references/C4 model.md`. Apply the tagging conventions in the [Tagging cheat sheet](#tagging-cheat-sheet) below.
-5. Once the diagram has shape, run `scripts/verify.sh` (or `npx aact check` directly) from the working directory. If `aact.config.ts` is missing, run `npx aact init` first.
+5. Once the diagram has shape, run `scripts/verify.sh` (or `npx aact@beta check` directly) from the working directory. If `aact.config.ts` is missing, run `npx aact@beta init` first.
 6. Walk through any violations using [Interpreting violations](#interpreting-violations).
 
 ### B. Writing an ADR
@@ -78,9 +78,9 @@ The skill keeps **all reasoning about patterns and ADRs in markdown** (loaded on
 
 ### C. Reviewing an existing architecture
 
-1. Run `scripts/verify.sh` from the project root. The script forwards to `npx aact check`.
+1. Run `scripts/verify.sh` from the project root. The script forwards to `npx aact@beta check`.
 2. For each rule that fired, open the matching reference (see table below) and explain to the user **why** the pattern matters, not just **what** the rule said.
-3. If the user wants the auto-fix, run `npx aact check --fix`. Show the diff. Do not blindly apply — confirm with the user that the fix matches their intent.
+3. If the user wants the auto-fix, run `npx aact@beta check --fix`. Show the diff. Do not blindly apply — confirm with the user that the fix matches their intent.
 
 ### D. Explaining a specific rule
 
@@ -227,7 +227,7 @@ aact / tooling specifics:
 
 Run `scripts/verify.sh` from the project root. It is a thin wrapper around `npx aact@beta check` that:
 - Uses the project's `aact.config.ts` if present.
-- Falls back to creating one via `npx aact init` (with confirmation) if missing.
+- Falls back to creating one via `npx aact@beta init` (with confirmation) if missing.
 - Relays exit code so it can be used in CI.
 
 ```bash
