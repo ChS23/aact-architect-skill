@@ -48,11 +48,15 @@ export const myRule = defineRule({
 
   check(model: Model, options?: MyOptions) {
     const threshold = options?.threshold ?? 0;
-    return Object.values(model.containers)
+    return Object.values(model.elements)
       .filter(/* condition */)
-      .map((c) => ({
-        container: c.name,
+      .map((element) => ({
+        target: element.name,
+        targetKind: "element" as const,
         message: "explanation of the violation",
+        ...(element.sourceLocation
+          ? { sourceLocation: element.sourceLocation }
+          : {}),
       }));
   },
 });
@@ -63,24 +67,71 @@ Required fields: `name`, `description`, `check`. Optional: `fix`.
 ### `check(model, options?): Violation[]`
 
 Pure function. Receives the parsed `Model` and (optionally typed) options.
-Returns an array of `Violation` objects, each with a `container` name and
-a human-readable `message`.
+Returns an array of `Violation` objects, each with a `target` name, a
+`targetKind: "element" | "boundary"` discriminator, and a human-readable
+`message`. Most rules flag elements (`targetKind: "element"`); rules that
+operate on a boundary as a whole (e.g. cohesion-style checks) emit
+`targetKind: "boundary"`. The CLI uses the discriminator to look the
+target up in `model.elements` or `model.boundaries`, so consumers don't
+have to guess.
 
-`Model.containers` is a `Record<string, Container>` — iterate with
-`Object.values(model.containers)`. `Container.kind` is the typed C4 kind
+Anchor on a precise relation / declaration whenever possible by setting
+`sourceLocation`. When omitted, the CLI falls back to the target node's
+own `sourceLocation`; both forms produce clickable links in
+hyperlink-capable terminals and `file=...,line=...,col=...` annotations
+in CI.
+
+`Model.elements` is a `Record<string, Element>` — iterate with
+`Object.values(model.elements)`. `Element.kind` is the typed C4 kind
 (`Person | System | Container | ContainerDb | ContainerQueue | Component
 | ComponentDb | ComponentQueue`), `external: boolean` is orthogonal.
+(The wrapper type was renamed from `Container` to `Element` in v3 stable
+to free the literal `kind: "Container"` to mean the C4 level-2 concept
+without collision.)
 
-### `fix(model, violations, syntax, options?): FixResult[]`
+### `fix(ctx): FixResult[]`
 
 Optional. When implemented, `aact check --fix` will offer
-auto-correction. Receives the same `model` and the violations the rule
-emitted in the current pass, plus a `SourceSyntax` adapter for the
-current format (PlantUML / Structurizr).
+auto-correction. Receives a single `FixContext<O>` arg with `model`,
+`violations`, `syntax` (a `FormatSyntax` content-builder for the
+current format), and `options`. Returns `FixResult[]` — each result
+carries a description and a list of range-based `SourceEdit`s that
+the applier splices into the source string at the offsets given by
+`SourceLocation`. No regex search / pattern matching — every edit
+anchors on a real byte range from the parsed model.
 
-See the upstream built-in `acl` rule (`src/rules/acl.ts`) for a worked
-example: it injects a new ACL container and rewires the violating
-relations through it.
+```ts
+fix(ctx) {
+  const { model, violations, syntax } = ctx;
+  return violations.flatMap((v) => {
+    const element = model.elements[v.target];
+    if (!element?.sourceLocation) return [];
+    return [
+      {
+        rule: "myRule",
+        description: `Tag ${v.target} as legacy-managed`,
+        edits: [
+          {
+            kind: "replace",
+            range: element.sourceLocation,
+            content: syntax.containerDecl(
+              element.name,
+              element.label,
+              "legacy",
+            ),
+          },
+        ],
+      },
+    ];
+  });
+}
+```
+
+See the upstream built-in `acl` rule (`src/rules/acl.ts`) for a richer
+worked example: it inserts a new ACL container plus an entry edge
+right after the offending element (one `insert-after` edit), then
+rewires every external relation through it (one `replace` edit per
+edge).
 
 Skip `fix()` when the resolution is a human decision the tool cannot
 auto-resolve (choosing an owner, choosing a name, choosing where to put a
@@ -165,7 +216,8 @@ describe("myRule", () => {
   it("flags X when Y", () => {
     const violations = myRule.check(model);
     expect(violations).toHaveLength(1);
-    expect(violations[0].container).toBe("expected_name");
+    expect(violations[0].target).toBe("expected_name");
+    expect(violations[0].targetKind).toBe("element");
   });
 
   it("respects the threshold option", () => {

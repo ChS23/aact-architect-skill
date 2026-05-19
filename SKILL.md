@@ -167,16 +167,19 @@ When the built-in catalogue does not match a project's conventions — bounded-c
    ```
 
 4. **Conflict policy.** A custom rule whose `name` matches a built-in or another custom rule is rejected at startup. Prefix names per project (`acmeBcIsolation`, `mermaidLegend`).
-5. **Optional `fix()`.** `check` is required; `fix` is optional. When provided, `aact check --fix` will offer auto-correction. See the built-in `acl` (`src/rules/acl.ts` in the upstream repo) for a worked example — it injects a new ACL container and rewires violating relations through it.
-6. **Anchor violations precisely.** A custom rule may set
-   `Violation.sourceLocation` to point at the exact relation /
-   boundary that broke the principle:
+5. **Optional `fix(ctx)`.** `check` is required; `fix` is optional. When provided, `aact check --fix` will offer auto-correction. The fix function takes a single `FixContext<O>` arg (`{ model, violations, syntax, options }`) and returns `FixResult[]` whose `edits` anchor on real `SourceLocation` ranges — no regex matching. See the built-in `acl` (`src/rules/acl.ts` in the upstream repo) for a worked example — it injects a new ACL container and rewires violating relations through it via one `insert-after` + one `replace` per offending edge.
+6. **Anchor violations precisely.** A custom rule sets `target` (name
+   of the offending node), `targetKind` (`"element"` or `"boundary"`,
+   tells the CLI which lookup table to consult), and optionally
+   `sourceLocation` to point at the exact relation / boundary that
+   broke the principle:
 
    ```ts
-   for (const rel of container.relations) {
+   for (const rel of element.relations) {
      if (rel.tags.includes("legacy")) {
        violations.push({
-         container: container.name,
+         target: element.name,
+         targetKind: "element" as const,
          message: `uses legacy edge → ${rel.to}`,
          sourceLocation: rel.sourceLocation, // ← jumps to Rel line
        });
@@ -185,9 +188,9 @@ When the built-in catalogue does not match a project's conventions — bounded-c
    ```
 
    Rules that omit `sourceLocation` automatically fall back to the
-   container's (or boundary's, if the rule operates on boundaries)
-   declaration line — so legacy `{ container, message }` rules still
-   get clickable links for free.
+   target node's declaration line — so a minimal `{ target,
+   targetKind, message }` violation still gets a clickable link for
+   free.
 7. **List the effective set** any time with `npx aact@beta rule list` — built-in + custom together with enabled state. Use `--json` for tooling.
 
 Read `references/Writing custom rules.md` for the full pattern guide (when to write, anatomy, registration, options inference, fix capability, testing).
@@ -218,7 +221,7 @@ If the user is using non-default tags (e.g. they call repos `relay` only, not `r
 
 ## Interpreting violations
 
-Since v3.0.0-beta.8 `aact check` prints violations in eslint-style with
+Since v3.0.0-beta.11 `aact check` prints violations in eslint-style with
 a source anchor on every line:
 
 ```
@@ -227,17 +230,19 @@ architecture.puml:13:1  error  crud  orders: directly accesses database orders_d
 
 The location column is an OSC8 hyperlink in TTYs that support it
 (iTerm2, Ghostty, VSCode terminal, Windows Terminal, modern tmux) —
-click to open the file at the offending byte. In CI logs / piped
+click to open the file at the offending position. In CI logs / piped
 output it falls back to plain text. The JSON envelope carries the
 same structured location under `data.violations[].sourceLocation`
-(`{ file, start: { line, col, offset }, end: { ... } }`) — agents
-should read it directly when fixing.
+(`{ file, start: { line, col, offset }, end: { ... } }`, where
+`offset` is a UTF-16 code-unit index into the source string) plus
+`target` / `targetKind` so agents know whether to look the offender
+up in `model.elements` or `model.boundaries` when fixing.
 
 When `aact check` reports a violation:
 
-1. Read the message — `path:line:col` points at the offending byte
-   (relation, boundary, or container declaration depending on the
-   rule). Open the file at that line for context.
+1. Read the message — `path:line:col` points at the offending
+   position (relation, boundary, or element declaration depending on
+   the rule). Open the file at that line for context.
 2. Open the rule's reference (table above). Summarise the principle the rule encodes.
 3. Explain *to the user* why this principle matters in their domain, before suggesting a fix.
 4. Suggest one of three resolutions:
