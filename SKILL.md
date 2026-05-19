@@ -90,7 +90,7 @@ User asks "what does crud mean" or "why did acl fire". Open the matching ADR/ref
 
 When the user asks "what's our coupling?", "is this boundary cohesive enough?", or wants numbers to bring to a review:
 
-1. Run `npx aact@beta analyze` from the project root. For machine-readable output (e.g. to diff between two versions), use `--format json`.
+1. Run `npx aact@beta analyze` from the project root. For machine-readable output (e.g. to diff between two versions), use `--json`.
 2. The report includes:
    - `elementsCount` — total containers in the model.
    - `syncApiCalls`, `asyncApiCalls` — count of REST vs async edges.
@@ -168,7 +168,27 @@ When the built-in catalogue does not match a project's conventions — bounded-c
 
 4. **Conflict policy.** A custom rule whose `name` matches a built-in or another custom rule is rejected at startup. Prefix names per project (`acmeBcIsolation`, `mermaidLegend`).
 5. **Optional `fix()`.** `check` is required; `fix` is optional. When provided, `aact check --fix` will offer auto-correction. See the built-in `acl` (`src/rules/acl.ts` in the upstream repo) for a worked example — it injects a new ACL container and rewires violating relations through it.
-6. **List the effective set** any time with `npx aact@beta rule list` — built-in + custom together with enabled state. Use `--json` for tooling.
+6. **Anchor violations precisely.** A custom rule may set
+   `Violation.sourceLocation` to point at the exact relation /
+   boundary that broke the principle:
+
+   ```ts
+   for (const rel of container.relations) {
+     if (rel.tags.includes("legacy")) {
+       violations.push({
+         container: container.name,
+         message: `uses legacy edge → ${rel.to}`,
+         sourceLocation: rel.sourceLocation, // ← jumps to Rel line
+       });
+     }
+   }
+   ```
+
+   Rules that omit `sourceLocation` automatically fall back to the
+   container's (or boundary's, if the rule operates on boundaries)
+   declaration line — so legacy `{ container, message }` rules still
+   get clickable links for free.
+7. **List the effective set** any time with `npx aact@beta rule list` — built-in + custom together with enabled state. Use `--json` for tooling.
 
 Read `references/Writing custom rules.md` for the full pattern guide (when to write, anatomy, registration, options inference, fix capability, testing).
 
@@ -198,9 +218,26 @@ If the user is using non-default tags (e.g. they call repos `relay` only, not `r
 
 ## Interpreting violations
 
+Since v3.0.0-beta.8 `aact check` prints violations in eslint-style with
+a source anchor on every line:
+
+```
+architecture.puml:13:1  error  crud  orders: directly accesses database orders_db — add a repo or relay
+```
+
+The location column is an OSC8 hyperlink in TTYs that support it
+(iTerm2, Ghostty, VSCode terminal, Windows Terminal, modern tmux) —
+click to open the file at the offending byte. In CI logs / piped
+output it falls back to plain text. The JSON envelope carries the
+same structured location under `data.violations[].sourceLocation`
+(`{ file, start: { line, col, offset }, end: { ... } }`) — agents
+should read it directly when fixing.
+
 When `aact check` reports a violation:
 
-1. Read the message — it names the offending container and the rule.
+1. Read the message — `path:line:col` points at the offending byte
+   (relation, boundary, or container declaration depending on the
+   rule). Open the file at that line for context.
 2. Open the rule's reference (table above). Summarise the principle the rule encodes.
 3. Explain *to the user* why this principle matters in their domain, before suggesting a fix.
 4. Suggest one of three resolutions:
@@ -241,12 +278,15 @@ bash scripts/verify.sh --dry-run # preview fixes without writing
 | Command | Purpose | Common flags |
 |---------|---------|--------------|
 | `aact init` | Scaffold `aact.config.ts` + starter `architecture.puml`. | (no flags) |
-| `aact check` | Run all enabled rules against the source. | `--fix`, `--dry-run`, `--format text\|json\|github`, `--config <path>` |
-| `aact analyze` | Print coupling/cohesion metrics (workflow E). | `--format text\|json`, `--config <path>` |
-| `aact generate` | Emit PlantUML or Kubernetes from the model (workflow F). | `--format plantuml\|kubernetes`, `--output <path>`, `--config <path>` |
+| `aact check` | Run all enabled rules against the source. | `--fix`, `--dry-run`, `--json`, `--config <path>` |
+| `aact analyze` | Print coupling/cohesion metrics (workflow E). | `--json`, `--config <path>` |
+| `aact generate` | Emit PlantUML or Kubernetes from the model (workflow F). | `--format plantuml\|kubernetes`, `--output <path>`, `--json`, `--config <path>` |
 | `aact rule list` | List the effective rule set (built-in + custom, enabled state). | `--json` |
 
-`--format github` for `check` produces GitHub Actions annotations — useful when wiring aact into CI as a status check.
+GitHub Actions annotations on `check` auto-enable when
+`GITHUB_ACTIONS=true` is set (CI standard env). Annotations include
+`file=`/`line=`/`col=` from the violation's `sourceLocation`, so they
+surface as inline PR comments anchored to the offending byte.
 
 ## Maintaining the skill
 
