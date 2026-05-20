@@ -332,10 +332,71 @@ bash scripts/verify.sh --dry-run # preview fixes without writing
 - **Text** (default) — human-readable, OSC 8 hyperlinks on
   `file:line:col` anchors so editors in the integrated terminal
   jump to source on click. Paths render relative to cwd.
-- **`--json`** — `CliEnvelope<TData>` shape with `schemaVersion: 1`,
-  `command`, `exitCode`, `data`, `diagnostics`, and `meta`. Stable
-  contract for agent loops and CI consumers. Exit codes follow
-  Unix: `0` clean, `1` violations / unhappy domain, `2` tool error.
+- **`--json`** — stable `CliEnvelope<TData>` envelope, frozen at
+  `schemaVersion: 1` through v3 GA. Use this whenever you need to
+  reason about the output programmatically (CI gates, agent
+  loops, diffing two runs). The envelope is the same shape for
+  every command; only `data` and the diagnostic kinds change.
+
+  ```ts
+  // src/cli/output/types.ts — public contract
+  interface CliEnvelope<TData> {
+    schemaVersion: 1;
+    command: string;                  // "check" | "analyze" | "model" | "diff" | …
+    ok: boolean;                      // exitCode === 0
+    exitCode: 0 | 1 | 2;              // 0 clean, 1 violations, 2 tool error
+    data: TData;                      // see per-command data shapes below
+    diagnostics: readonly Diagnostic[]; // warnings/info; closed `DiagnosticKind` taxonomy
+    meta: {
+      aactVersion: string;
+      durationMs: number;
+      configPath: string | null;      // c12-resolved aact.config.ts (absolute)
+      source: string | null;          // resolved source.path (absolute)
+    };
+  }
+  ```
+
+  Per-command `data` (each is exported from the public API):
+  - `aact check` → `CheckData` — `violations[]` (each with
+    `rule`, `target`, `targetKind`, `message`, `severity`,
+    optional `sourceLocation` + `relatedLocations[]`),
+    `suggestedFixes[]`, `summary`, `rules[]` (the rule catalogue
+    so agents don't need a separate `rule list` call), optional
+    `fixesApplied` when `--fix` was used.
+  - `aact analyze` → `AnalyzeData` — `elementsByKind`,
+    `relationsByStyle` (sync/async/unspecified), per-boundary
+    `cohesion` / `syncCoupling` / `asyncCoupling` /
+    `unspecifiedCoupling` / `ratio` / `couplingRelations[]`,
+    `fanIn` / `fanOut` top-N hotspots, `cycles` (count + smallest).
+  - `aact model` → `ModelData` — the full normalised graph
+    (`elements`, `boundaries`, `rootBoundaryNames`, optional
+    `workspace`) plus loader `issues[]`. Use this to confirm the
+    parser sees what you intended.
+  - `aact diff` → `DiffData` — `summary.headline` (one-line
+    reasoning seed), `summary.bySeverity`, sorted `changes[]`
+    (entity-tagged element/boundary/relation/workspace with
+    `action: added | removed | modified | renamed | moved`,
+    severity, per-field deltas, optional `confidence` on
+    renames), `baseline` / `current` provenance, optional
+    `patch` (RFC 6902) when `--with-patch` was set.
+  - `aact rule list` → `RuleListData` — `rules[]` with
+    `source` (built-in / custom), `enabled`, `hasFix`, optional
+    `helpUri` (the rule's ADR blob URL when one exists).
+  - `aact rule explain <name>` → `RuleExplainData` — same metadata
+    plus `rationale`, `examples` (good/bad pairs), `adrPath`.
+  - `aact generate` → `GenerateData` — `formatName`,
+    `outputSink` (`stdout | file | directory | none`),
+    `outputPath`, list of generated files with sizes.
+  - `aact init` → `InitData` — created / skipped file paths.
+  - `aact skill install` → `SkillData` — install plans per target,
+    with `action` (`installed | updated | reinstalled`) and the
+    final `skillDir` for each.
+
+  Exit codes are part of the contract: `0` clean, `1`
+  domain-unhappy (violations exist, structural diff has changes
+  in `--strict` mode), `2` tool error (config invalid, source
+  missing, parse failed). Agents must branch on these — do not
+  collapse them.
 - **`--sarif`** (on `check` / `model`) — SARIF v2.1.0 with the
   canonical `$schema` URL and `tool.driver.name: "aact"`. Upload
   directly to GitHub Code Scanning, SonarQube, or any SARIF
