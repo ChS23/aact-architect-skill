@@ -1,0 +1,141 @@
+{
+  "skill_name": "aact-architect",
+  "about": "Output-quality acceptance cases for validating aact-architect behavior after the skill triggers. These complement evals/evals.json, which only tests trigger-rate behavior.",
+  "cases": [
+    {
+      "id": "uc1-empty-guided-bootstrap",
+      "prompt": "Помоги набросать C4 container diagram для checkout: orders, payments, Stripe, Postgres.",
+      "setup": "Run in an empty writable directory.",
+      "must": [
+        "Detect the directory is empty and run npx --yes aact@beta init.",
+        "Explain that aact.config.ts configures source/rules and architecture.puml is the editable C4 model.",
+        "Replace the starter architecture with a checkout model based on the user's domain.",
+        "For ACL calls to external REST/HTTPS systems, put API Gateway in the relation technology, e.g. HTTPS via API Gateway.",
+        "Run or attempt npx --yes aact@beta check after the model has shape.",
+        "Explain any violations in plain language and propose the next edit."
+      ],
+      "must_not": [
+        "Answer only with prose while leaving the directory empty.",
+        "Hand-write a runtime-importing aact.config.ts before local aact is installed.",
+        "Require the user to understand C4 or aact before proceeding."
+      ]
+    },
+    {
+      "id": "uc2-empty-vibecoder-interview",
+      "prompt": "хочу понять архитектуру моего сервиса заказов, я не шарю как это рисовать",
+      "setup": "Run in an empty writable directory.",
+      "must": [
+        "Use guided bootstrap instead of asking for a pre-existing .puml file.",
+        "Ask only the missing C4 questions needed to proceed: system name, users, external systems, runnable units, data stores, and relations.",
+        "Keep explanations plain-language and action-oriented."
+      ],
+      "must_not": [
+        "Dump a generic C4 tutorial.",
+        "Refuse to proceed until the user supplies a complete architecture file."
+      ]
+    },
+    {
+      "id": "uc3-existing-project-review",
+      "prompt": "проверь архитектуру и предложи что исправить",
+      "setup": "Run in a directory containing aact.config.ts and architecture.puml with a deliberate CRUD violation.",
+      "must": [
+        "Use the existing files and do not rerun init.",
+        "Run scripts/verify.sh or npx --yes aact@beta check.",
+        "Explain each violation through the rule purpose and domain impact.",
+        "Suggest fixes without overwriting the user's architecture."
+      ],
+      "must_not": [
+        "Copy starter assets over existing files.",
+        "Apply --fix unless the user explicitly asks for changes."
+      ]
+    },
+    {
+      "id": "uc4-autofix-explicit-only",
+      "prompt": "aact ругается на crud, поправь",
+      "setup": "Run in an existing project with a CRUD violation.",
+      "must": [
+        "Treat the user's wording as explicit permission to edit.",
+        "Use aact check --fix when the built-in fix applies.",
+        "Show the resulting diff or summarize the exact file changes.",
+        "Re-run check after applying the fix."
+      ],
+      "must_not": [
+        "Apply unrelated refactors.",
+        "Hide that --fix changed architecture source."
+      ]
+    },
+    {
+      "id": "uc5-explain-only-no-bootstrap",
+      "prompt": "что означает crud rule и зачем repo service?",
+      "setup": "Run in an empty directory.",
+      "must": [
+        "Answer without running npx --yes aact@beta init.",
+        "Explain the rule purpose in plain language.",
+        "Give a small example of direct DB access vs repo-mediated access."
+      ],
+      "must_not": [
+        "Create aact.config.ts or architecture.puml.",
+        "Tell the user to initialize a project before answering."
+      ]
+    },
+    {
+      "id": "uc6-adr-only",
+      "prompt": "напиши ADR почему мы ставим ACL перед legacy CRM",
+      "setup": "Run in a directory with no architecture files.",
+      "must": [
+        "Produce an ADR with Status, Context, Decision, and Consequences.",
+        "Ask for missing decision details only if needed.",
+        "Mention which aact rule can enforce or validate the decision."
+      ],
+      "must_not": [
+        "Run init unless the user asks to create architecture files.",
+        "Write a marketing-style document instead of an ADR."
+      ]
+    },
+    {
+      "id": "uc7-custom-rule-current-api",
+      "prompt": "хочу правило, чтобы все контейнеры имели owner:<team> tag",
+      "setup": "Run in an existing aact project.",
+      "must": [
+        "Check whether a built-in rule already covers the need.",
+        "Use the current Model API with model.elements, not model.containers.",
+        "Explain that local aact is required before switching config to defineConfig.",
+        "If local aact is not installed, ask for permission before running a package manager or switching config to runtime imports.",
+        "Patch the existing config instead of rewriting it from scratch."
+      ],
+      "must_not": [
+        "Use stale Model.containers examples.",
+        "Install aact locally without explicit user approval.",
+        "Introduce a runtime import before local aact is installed."
+      ]
+    },
+    {
+      "id": "uc8-analyze-generate-cli",
+      "prompt": "посчитай coupling/cohesion и сгенерируй Kubernetes scaffold",
+      "setup": "Run in an existing aact project.",
+      "must": [
+        "Use npx --yes aact@beta analyze --json for metrics.",
+        "Use npx --yes aact@beta generate --format kubernetes for scaffold generation.",
+        "Explain that generated Kubernetes YAML is a scaffold, not production manifests."
+      ],
+      "must_not": [
+        "Invent metrics without running the CLI.",
+        "Present generated YAML as production-ready."
+      ]
+    },
+    {
+      "id": "uc9-near-miss-no-trigger",
+      "prompt": "сделай Dockerfile для Node.js microservice with a multi-stage build",
+      "setup": "Run in any project.",
+      "must": [
+        "Handle the Dockerfile task as ordinary coding/devops work.",
+        "Avoid aact/C4 workflow unless the user explicitly asks for architecture validation."
+      ],
+      "must_not": [
+        "Run npx --yes aact@beta init.",
+        "Create architecture.puml.",
+        "Explain microservice architecture patterns when the user asked for a Dockerfile."
+      ]
+    }
+  ]
+}

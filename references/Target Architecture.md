@@ -22,14 +22,14 @@ aact — OSS CLI и библиотека для проверки архитек�
 
 | Команда | Назначение |
 | --- | --- |
-| `npx aact@beta init` | Создать `aact.config.ts` и starter `architecture.puml`. |
-| `npx aact@beta check` | Проверить правила, exit code 1 при нарушениях. |
-| `npx aact@beta check --fix` | Применить conservative auto-fixes, если формат поддерживает fix. |
-| `npx aact@beta analyze` | Посчитать architecture metrics: coupling, cohesion, API calls, DB usage. |
-| `npx aact@beta generate --format plantuml` | Сгенерировать PlantUML из Model. |
-| `npx aact@beta generate --format kubernetes` | Сгенерировать Kubernetes scaffold из Model. |
-| `npx aact@beta rule list` | Показать effective rule set: built-in + custom. |
-| `npx aact@beta skill` | Установить `aact-architect` skill для агентных workflow. |
+| `npx --yes aact@beta init` | Создать `aact.config.ts` и starter `architecture.puml`. |
+| `npx --yes aact@beta check` | Проверить правила, exit code 1 при нарушениях. |
+| `npx --yes aact@beta check --fix` | Применить conservative auto-fixes, если формат поддерживает fix. |
+| `npx --yes aact@beta analyze` | Посчитать architecture metrics: coupling, cohesion, API calls, DB usage. |
+| `npx --yes aact@beta generate --format plantuml` | Сгенерировать PlantUML из Model. |
+| `npx --yes aact@beta generate --format kubernetes` | Сгенерировать Kubernetes scaffold из Model. |
+| `npx --yes aact@beta rule list` | Показать effective rule set: built-in + custom. |
+| `npx --yes aact@beta skill` | Установить `aact-architect` skill для агентных workflow. |
 
 ## Принципы
 
@@ -92,8 +92,10 @@ Model is the canonical architecture representation.
 
 ```ts
 export interface Model {
-  readonly containers: Readonly<Record<string, Container>>;
+  readonly elements: Readonly<Record<string, Element>>;
   readonly boundaries: Readonly<Record<string, Boundary>>;
+  readonly rootBoundaryNames: readonly string[];
+  readonly workspace?: WorkspaceMetadata;
 }
 ```
 
@@ -163,46 +165,44 @@ Custom rule policy:
 
 ## CLI output direction
 
-Current beta has mixed machine-output styles (`--format json` in some commands,
-`--json` in `rule list`). Target direction:
+Current beta uses one stable JSON envelope for all `--json` commands:
 
 ```bash
 aact check [--json] [--fix] [--dry-run]
 aact analyze [--json]
 aact generate --format <plantuml|kubernetes> [--output <path>] [--json]
 aact rule list [--json]
-aact skill [--json]
+aact skill install [--json]
 ```
 
-Target machine-readable envelope:
+Machine-readable envelope:
 
 ```ts
-interface AactCliResult<TData> {
-  schemaVersion: "aact.cli.v1";
+interface CliEnvelope<TData> {
+  schemaVersion: 1;
   command: string;
   ok: boolean;
-  status: "success" | "failed" | "partial";
+  exitCode: 0 | 1 | 2;
   data: TData;
-  diagnostics: AactDiagnostic[];
-  summary?: Record<string, unknown>;
+  diagnostics: Diagnostic[];
   meta: {
     aactVersion: string;
-    durationMs?: number;
-    configPath?: string;
-    source?: string;
+    durationMs: number;
+    configPath: string | null;
+    source: string | null;
   };
 }
 ```
 
-Rule diagnostics should eventually include:
+Rule diagnostics include:
 
-- stable issue code;
+- stable diagnostic kind;
 - severity;
 - message;
 - source location;
 - affected element/relation;
 - fixability;
-- optional non-binding hints.
+- optional related locations.
 
 `--fix` remains the switch that applies safe edits. Hints without `--fix` should
 be diagnostics, not a separate `suggest` command.
@@ -221,7 +221,7 @@ sync      -> runtime/infra source + Model -> DriftReport / Patch
 Example future command:
 
 ```bash
-npx aact@beta sync \
+npx --yes aact@beta sync \
   --source ./architecture.puml \
   --infra ./deploy/kubernetes \
   --json
@@ -262,4 +262,3 @@ source locations. Target v3.x parser direction:
   silently skipped when it does not affect the Model;
 - parser recovery should return partial Model + issues instead of failing the
   whole command when possible.
-

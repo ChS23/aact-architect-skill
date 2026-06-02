@@ -15,9 +15,9 @@ System_Boundary(checkout, "Checkout") {
   ContainerDb(orders_db, "Orders DB", "PostgreSQL")
   Container(payment_acl, "Payment ACL", "", "Wraps payment_provider", $tags="acl")
 
-  Rel(orders, orders_repo, "")
-  Rel(orders_repo, orders_db, "PostgreSQL")
-  Rel(orders, payment_acl, "REST")
-  Rel(payment_acl, payment_provider, "REST")
+  Rel(orders, orders_repo, "Reads/writes orders")
+  Rel(orders_repo, orders_db, "Reads/writes", "PostgreSQL")
+  Rel(orders, payment_acl, "Requests payment authorization", "REST")
+  Rel(payment_acl, payment_provider, "Calls provider API", "HTTPS via API Gateway")
 }
 @enduml

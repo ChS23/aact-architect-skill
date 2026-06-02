@@ -1,8 +1,8 @@
 ---
 name: aact-architect
-description: Design, review, measure, and generate microservice architectures using the aact pattern catalog and CLI. Use this skill when the user is sketching a C4 system in PlantUML or Structurizr, writing or reviewing an ADR, choosing how to tag containers (acl, repo, relay), writing project-specific compliance checks (custom rules in aact.config.ts), explaining why an aact rule fired, asking about microservice patterns (ACL, CRUD-services, Database-per-service, API Gateway, Cohesion vs Coupling, Stable Dependencies, Common Reuse, Acyclic Dependencies, Bounded Context isolation), looking at coupling/cohesion metrics for their services, or asking aact to emit PlantUML or Kubernetes manifests from their architecture — even when the user does not explicitly mention "aact" or "C4". Bundles the canonical ADRs, an ADR template, starter architecture files, a custom-rules authoring guide, and wrappers around `aact check / analyze / generate / rule list`.
+description: Design, review, measure, and generate microservice architectures using the aact pattern catalog and CLI. Use this skill whenever the user sketches or reviews a C4 / microservice architecture, asks for PlantUML or Structurizr architecture-as-code, writes an ADR, asks why an aact rule fired, chooses tags (acl, repo, relay), creates custom rules, measures coupling/cohesion, or generates Kubernetes/PlantUML from the model — even if they do not mention "aact" or "C4". In an empty project, immediately guide them by running `npx --yes aact@beta init`, then edit `architecture.puml` and run `aact check`; do not leave vibe-coding users with prose only.
 license: GPL-3.0 (skill code and bundled ADRs derive from Byndyusoft/aact, GPL-3.0)
-compatibility: Requires Node.js >= 22. The skill uses `aact@beta` via `npx` so it tracks the current v3 beta dist-tag instead of pinning a concrete beta version. v3 brings typed Model API, `customRules` extension, `defineConfig` generics with autocomplete for custom rule options, and the `aact rule list` command — all backward-compatible at the PlantUML / Structurizr source level.
+compatibility: Requires Node.js >= 22. The skill uses `aact@beta` via `npx --yes` so it tracks the current v3 beta dist-tag instead of pinning a concrete beta version. v3 brings typed Model API, `customRules` extension, `defineConfig` generics with autocomplete for custom rule options, and the `aact rule list` command — all backward-compatible at the PlantUML / Structurizr source level.
 metadata:
   author: Sergei Volchkov (https://github.com/ChS23)
   upstream: https://github.com/Byndyusoft/aact
@@ -15,6 +15,19 @@ A working companion for designing, documenting, and validating microservice arch
 
 The skill keeps **all reasoning about patterns and ADRs in markdown** (loaded on demand) and **delegates verification to the deterministic `aact` CLI** (no LLM in the validation loop, no API keys baked in). The agent's job is to translate human intent into C4 + ADRs; aact's job is to check the result.
 
+## Fast path
+
+Use this before reading optional references:
+
+1. If the user asks to design, sketch, validate, analyze, or generate an
+   architecture and the directory has no `aact.config.*` or architecture
+   source, run `npx --yes aact@beta init` immediately. Then explain the
+   two files, edit `architecture.puml`, and run `npx --yes aact@beta check`.
+2. If `aact.config.*` or an architecture source already exists, do not
+   run `init`. Inspect the existing files and run the relevant command.
+3. If the user only asks a conceptual question or an ADR draft, do not
+   create files unless they ask for files.
+
 ## When this skill applies
 
 - The user describes a system in microservice terms (services, databases, async/sync calls, external integrations) and wants a C4 sketch.
@@ -25,45 +38,95 @@ The skill keeps **all reasoning about patterns and ADRs in markdown** (loaded on
 - The user asks about **coupling / cohesion / element counts** for their architecture, or wants to compare two versions quantitatively (this is `aact analyze`, workflow E).
 - The user wants **PlantUML emitted from a Structurizr workspace** (or vice versa), or **Kubernetes deployment YAMLs generated from the architectural model** as a starting point (this is `aact generate`, workflow F).
 
-## Setup before any workflow
+## Choose the operating mode first
 
-**Always run `npx aact@beta init` first** in the user's working
-directory — even if the user already pasted a `.puml` / `.dsl` body
-into the conversation. `init` writes:
+Before any workflow, classify the user's situation. This keeps the skill
+helpful for first-time / vibe-coding users without creating files during
+pure explanation tasks.
 
-- `aact.config.ts` with the **type-only** import (`import type { AactConfig } from "aact"`)
-- A starter `architecture.puml` you can replace
+### Guided bootstrap for empty projects
 
-The type-only template runs through jiti without `aact` being
-present in `node_modules`. **Do not hand-write an `aact.config.ts`
-that imports anything at runtime** — `import { defineConfig } from "aact"`
-fails with `Cannot find module 'aact'` until the user adds aact as
-a local devDependency (`pnpm add -D aact`). Hand-writing the config
-is also how the skill loses out on a future `init` template update.
+Use this mode when the user wants to design, review, validate, analyze,
+or generate architecture artifacts and the working directory has no
+`aact.config.*` and no architecture source (`architecture.puml`,
+`workspace.dsl`, `workspace.json`, or `*.aact.json`).
+
+1. Run `npx --yes aact@beta init` automatically.
+   This must be the next command after confirming the directory is an
+   empty architecture project. Do not read references, copy assets, or
+   draft the diagram first — bootstrap creates the working surface.
+2. Briefly explain the two created files:
+   - `aact.config.ts` configures the architecture source and rules.
+   - `architecture.puml` is the editable C4 model.
+3. Replace the starter architecture incrementally from the user's
+   description. Ask only the missing questions needed for the next C4
+   decision: system name, users, external systems, runnable units, data
+   stores, and relations.
+4. Run `npx --yes aact@beta check` once the model has shape.
+5. Explain violations in plain language and propose the next edit.
+
+`aact init` is non-destructive: existing `aact.config.ts` and
+`architecture.puml` are skipped, not overwritten. This is the preferred
+path for users who do not already know C4 or aact.
+
+### Existing project mode
+
+Use this mode when the working directory already has `aact.config.*` or
+an architecture source file. Do **not** rerun `init` or copy a starter
+over the user's files. Inspect the existing files, run the relevant CLI
+command (`check`, `model`, `analyze`, `generate`, `diff`), and patch the
+smallest surface needed.
+
+### Explanation-only / ADR-only mode
+
+Use this mode when the user asks a conceptual question ("what does the
+crud rule mean?", "explain cohesion vs coupling") or asks for an ADR
+draft but does not ask to create architecture files. Do **not** run
+`init` just to answer. Use the references and `aact rule explain` when
+available, and write files only when the user asks for files or the
+task naturally requires them.
+
+### Config import rule
+
+The `init` template uses a **type-only** import
+(`import type { AactConfig } from "aact"`). It runs through jiti without
+`aact` being present in `node_modules`. **Do not hand-write an
+`aact.config.ts` that imports anything at runtime** —
+`import { defineConfig } from "aact"` fails with `Cannot find module
+'aact'` until the user adds aact as a local devDependency
+(`pnpm add -D aact`).
 
 Only switch from the type-only template to `defineConfig` when:
 
-- The user explicitly installs aact locally (`pnpm add -D aact`),
+- aact is already installed locally, or the user explicitly approves
+  installing it locally after you explain the exact package-manager
+  command,
   **and**
-- They are adding `customRules` (workflow D) — that's the only
-  reason to need runtime imports.
+- They are adding `customRules` (workflow G) — that's the only reason
+  to need runtime imports.
 
-If you absolutely need to edit the config (e.g. add a `source`
-override), patch the existing file from `init` line by line —
-never overwrite it from scratch.
+If custom rules are needed and local aact is missing, ask before installing
+or switching imports:
+
+> Custom rules need `aact` as a local devDependency so `defineConfig`
+> and `defineRule` can be imported at runtime. Should I install it now
+> with `<detected package manager> add -D aact@beta` and then patch the
+> config?
+
+If you need to edit the config (e.g. add a `source` override), patch the
+existing file line by line — never overwrite it from scratch.
 
 ## Workflows
 
 ### A. Designing a new system from a description
 
 1. **Default to PlantUML** as the source format — lower entry barrier, single-file. Switch to **Structurizr DSL/JSON** only if the user already has a `workspace.json`/`workspace.dsl` in the project, or explicitly asks for it (e.g. they need multiple views or are using a Structurizr toolchain).
-2. Copy the matching stub into the user's working directory:
-   - `assets/architecture-stub.puml` for PlantUML, save as `architecture.puml`.
-   - `assets/workspace-stub.dsl` for Structurizr, save as `workspace.dsl`.
-3. **Before adding elements, get the C4 discipline right.** Read `references/C4 model.md` — it has the canonical definitions, a decision procedure for "is this a Container?", and the failure modes that produce plausible-but-wrong models (layers-as-containers, over-decomposition, one shared DB box, external systems modelled as internal). The worked examples in `assets/example-1-system-context.puml` / `example-2-container.puml` / `example-3-component.puml` show correct granularity at each level.
-4. Walk the user through their system, adding containers one by one — follow the minimum-viable-C4 procedure in `references/C4 model.md`. Apply the tagging conventions in the [Tagging cheat sheet](#tagging-cheat-sheet) below.
-5. Once the diagram has shape, run `scripts/verify.sh` (or `npx aact@beta check` directly) from the working directory. If `aact.config.ts` is missing, run `npx aact@beta init` first — do **not** hand-write the config (see [Setup before any workflow](#setup-before-any-workflow)).
-6. Walk through any violations using [Interpreting violations](#interpreting-violations).
+2. In an empty project, use [guided bootstrap](#guided-bootstrap-for-empty-projects). `aact init` creates the working `architecture.puml` and config; do not copy bundled stub assets over it.
+3. In an existing project, patch the current `architecture.puml`, `workspace.dsl`, or `workspace.json` in place. Only use `assets/architecture-stub.puml` / `assets/workspace-stub.dsl` when the user explicitly asks for a standalone example or cannot run the CLI.
+4. **Before adding elements, get the C4 discipline right.** Read `references/C4 model.md` only when you need modeling guidance beyond the fast path — it has the canonical definitions, a decision procedure for "is this a Container?", and the failure modes that produce plausible-but-wrong models (layers-as-containers, over-decomposition, one shared DB box, external systems modelled as internal). The worked examples in `assets/example-1-system-context.puml` / `example-2-container.puml` / `example-3-component.puml` show correct granularity at each level.
+5. Walk the user through their system, adding containers one by one — follow the minimum-viable-C4 procedure in `references/C4 model.md`. Apply the tagging conventions in the [Tagging cheat sheet](#tagging-cheat-sheet) below.
+6. Once the diagram has shape, run `scripts/verify.sh` (or `npx --yes aact@beta check` directly) from the working directory.
+7. Walk through any violations using [Interpreting violations](#interpreting-violations).
 
 ### B. Writing an ADR
 
@@ -105,19 +168,29 @@ never overwrite it from scratch.
 
 ### C. Reviewing an existing architecture
 
-1. Run `scripts/verify.sh` from the project root. The script forwards to `npx aact@beta check`.
+1. If no architecture files exist, switch to [guided bootstrap](#guided-bootstrap-for-empty-projects) instead of pretending there is something to review. Otherwise run `scripts/verify.sh` from the project root. The script forwards to `npx --yes aact@beta check`.
 2. For each rule that fired, open the matching reference (see table below) and explain to the user **why** the pattern matters, not just **what** the rule said.
-3. If the user wants the auto-fix, run `npx aact@beta check --fix`. Show the diff. Do not blindly apply — confirm with the user that the fix matches their intent.
+3. If the user wants the auto-fix, run `npx --yes aact@beta check --fix`. Show the diff. Do not blindly apply — confirm with the user that the fix matches their intent.
 
 ### D. Explaining a specific rule
 
-User asks "what does crud mean" or "why did acl fire". Open the matching ADR/reference, summarise the *purpose* in one sentence, then quote the specific clause that the violation breaks.
+User asks "what does crud mean" or "why did acl fire". This is
+explanation-only unless the user also asks you to edit files, so do not
+bootstrap a project just to answer.
+
+Prefer `npx --yes aact@beta rule explain <name> --json` when you are already
+working in an aact project or can run the CLI without creating files.
+Otherwise open the matching ADR/reference, summarise the *purpose* in
+one sentence, and cite the relevant clause when the reference actually
+contains one. For rules that only have a short row in
+`references/patterns-catalog.md`, do not invent a quote — explain the
+principle from the row and say that the rule has no bundled ADR yet.
 
 ### E. Measuring coupling and cohesion
 
 When the user asks "what's our coupling?", "is this boundary cohesive enough?", or wants numbers to bring to a review:
 
-1. Run `npx aact@beta analyze` from the project root. For machine-readable output (e.g. to diff between two versions), use `--json`.
+1. Run `npx --yes aact@beta analyze` from the project root. For machine-readable output (e.g. to diff between two versions), use `--json`.
 2. The report includes:
    - `elementsCount` — total containers in the model.
    - `syncApiCalls`, `asyncApiCalls` — count of REST vs async edges.
@@ -132,13 +205,13 @@ When the user asks "what's our coupling?", "is this boundary cohesive enough?", 
 
 **Plantuml** — emit a `.puml` from any source (Structurizr → PlantUML is a common need: the team works in Structurizr, but the wiki / handout expects PlantUML). Without `--output` the result is printed to stdout.
 ```bash
-npx aact@beta generate --format plantuml --output ./diagrams/architecture.puml
+npx --yes aact@beta generate --format plantuml --output ./diagrams/architecture.puml
 ```
 The boundary heading label in the output is configurable via `generate.boundaryLabel` in `aact.config.ts`.
 
 **Kubernetes** — emit one YAML stub per deployable container with environment-variable scaffolding for DB connections, REST `*_BASE_URL`, and Kafka topics (`KAFKA_<TARGET>_TOPIC` for `async`-tagged relations). Output is a directory of `.yml` files.
 ```bash
-npx aact@beta generate --format kubernetes --output ./k8s
+npx --yes aact@beta generate --format kubernetes --output ./k8s
 ```
 Default output directory if `--output` is omitted: `resources/kubernetes/microservices` (configurable via `generate.kubernetes.path` in `aact.config.ts`).
 
@@ -175,13 +248,18 @@ When the built-in catalogue does not match a project's conventions — bounded-c
    });
    ```
 
-3. **Register + configure in `aact.config.ts`.** Custom rules require `aact` at runtime, so first make sure aact is installed locally — otherwise the `defineConfig` import fails with `Cannot find module 'aact'`:
+3. **Register + configure in `aact.config.ts`.** Custom rules require `aact` at runtime, so first check whether aact is installed locally. If it is missing, do **not** install it automatically. Ask the user for permission with the package-manager command you intend to run:
 
    ```bash
    pnpm add -D aact@beta   # or: npm i -D aact@beta / yarn add -D aact@beta
    ```
 
-   Then switch from the `import type { AactConfig }` template that `aact init` scaffolded to `defineConfig` so TypeScript autocompletes options for custom rules in `rules{}`:
+   Until the user approves, you can explain the planned rule and the
+   expected files, but do not run a package manager and do not switch
+   `aact.config.ts` to runtime imports. After approval or when local
+   aact already exists, switch from the `import type { AactConfig }`
+   template that `aact init` scaffolded to `defineConfig` so TypeScript
+   autocompletes options for custom rules in `rules{}`:
 
    ```ts
    import { defineConfig } from "aact";
@@ -199,7 +277,7 @@ When the built-in catalogue does not match a project's conventions — bounded-c
    });
    ```
 
-   Patch the existing config in place — copy `source`, `rules`, and the rest from what `aact init` wrote and only flip the import line plus add `customRules`. Do **not** rewrite the file from scratch — you will lose options the user already set, and forgetting `pnpm add -D aact` first will produce a confusing module-not-found error at load time.
+   Patch the existing config in place — copy `source`, `rules`, and the rest from what `aact init` wrote and only flip the import line plus add `customRules`. Do **not** rewrite the file from scratch — you will lose options the user already set, and switching before local aact exists will produce a confusing module-not-found error at load time.
 
 4. **Conflict policy.** A custom rule whose `name` matches a built-in or another custom rule is rejected at startup. Prefix names per project (`acmeBcIsolation`, `mermaidLegend`).
 5. **Optional `fix(ctx)`.** `check` is required; `fix` is optional. When provided, `aact check --fix` will offer auto-correction. The fix function takes a single `FixContext<O>` arg (`{ model, violations, syntax, options }`) and returns `FixResult[]` whose `edits` anchor on real `SourceLocation` ranges — no regex matching. See the built-in `acl` (`src/rules/acl.ts` in the upstream repo) for a worked example — it injects a new ACL container and rewires violating relations through it via one `insert-after` + one `replace` per offending edge.
@@ -226,7 +304,7 @@ When the built-in catalogue does not match a project's conventions — bounded-c
    target node's declaration line — so a minimal `{ target,
    targetKind, message }` violation still gets a clickable link for
    free.
-7. **List the effective set** any time with `npx aact@beta rule list` — built-in + custom together with enabled state. Use `--json` for tooling.
+7. **List the effective set** any time with `npx --yes aact@beta rule list` — built-in + custom together with enabled state. Use `--json` for tooling.
 
 Read `references/Writing custom rules.md` for the full pattern guide (when to write, anatomy, registration, options inference, fix capability, testing).
 
@@ -251,6 +329,12 @@ These tags are how aact knows what each container is. Get them right and the rul
 - **`acl`** — service that wraps an external integration. Without this tag, anything connecting to a `System_Ext` will trip the `acl` rule.
 - **`repo`** or **`relay`** — service whose only job is to own a database. Without this tag, anything connecting to a `ContainerDb` will trip the `crud` rule. Repos must not have non-DB dependencies.
 - **`async`** (on a relation, not a container) — marks an asynchronous edge (Kafka, queue). The Kubernetes generator emits `KAFKA_*_TOPIC` env vars for these instead of `*_BASE_URL`.
+- **API Gateway routing** is detected on the relation technology, not
+  by adding a special gateway container. For an ACL calling an external
+  REST/HTTPS system, write the edge like
+  `Rel(payment_acl, stripe, "Calls Stripe API", "HTTPS via API Gateway")`.
+  The built-in `apiGateway` rule matches `gateway` in the technology
+  field using `/gateway/i`.
 
 If the user is using non-default tags (e.g. they call repos `relay` only, not `repo`), set `crud: { repoTags: ["relay"] }` in `aact.config.ts`.
 
@@ -297,14 +381,18 @@ aact / tooling specifics:
 
 - `Stdlib_C4_Context` element type in PlantUML is `System` — those become `SYSTEM_TYPE` containers in the model. The Kubernetes generator whitelists `Container` only, so `System`, `Component`, `Person` and external systems are deliberately skipped — do not expect them in the YAML output.
 - `enrichTags` in the Structurizr loader is a naming heuristic: a container whose name contains "crud" gets a phantom `repo` tag automatically. If the user names a service `crud_processor` for unrelated reasons, override the inferred tag explicitly in their workspace.
+- `apiGateway` checks only ACL → external relations, and the default
+  pattern is `/gateway/i` against `Rel(..., technology)`. Prefer
+  `HTTPS via API Gateway` over inventing a fake internal gateway box.
 - Cohesion calculation includes inner-boundary coupling as parent cohesion. This is intentional but non-obvious — if the user sees an unexpected `parent cohesion ≥ sum of inner cohesions` violation, walk through the structure with them.
 - The `--fix` writer applies edits as line-by-line substring replacement, not AST-level. Multi-line block edits (e.g. removing a Structurizr container with nested tags) are not supported and need manual cleanup.
 
 ## Verifying
 
-Run `scripts/verify.sh` from the project root. It is a thin wrapper around `npx aact@beta check` that:
+Run `scripts/verify.sh` from the project root. It is a thin wrapper around `npx --yes aact@beta check` that:
 - Uses the project's `aact.config.ts` if present.
-- Falls back to creating one via `npx aact@beta init` (with confirmation) if missing.
+- Fails with a clear message if config is missing; for empty projects,
+  run `npx --yes aact@beta init` first via guided bootstrap.
 - Relays exit code so it can be used in CI.
 
 ```bash
@@ -327,86 +415,12 @@ bash scripts/verify.sh --dry-run # preview fixes without writing
 | `aact rule explain <name>` | Show a rule's rationale, good/bad examples, and the ADR it derives from. Use when the user asks "why did this fire?". | `--json` |
 | `aact skill install` | (Re)install this skill from the upstream `aact-architect-skill` repo. Picks up new SKILL.md / references / ADRs without manual `git pull`. Targets one or more clients: `--claude`, `--codex`, `--cursor`, `--copilot`, `--cline`, `--all`. `--dry-run` previews the writes. | `--force` overwrites an unmanaged directory |
 
-### Output modes
-
-- **Text** (default) — human-readable, OSC 8 hyperlinks on
-  `file:line:col` anchors so editors in the integrated terminal
-  jump to source on click. Paths render relative to cwd.
-- **`--json`** — stable `CliEnvelope<TData>` envelope, frozen at
-  `schemaVersion: 1` through v3 GA. Use this whenever you need to
-  reason about the output programmatically (CI gates, agent
-  loops, diffing two runs). The envelope is the same shape for
-  every command; only `data` and the diagnostic kinds change.
-
-  ```ts
-  // src/cli/output/types.ts — public contract
-  interface CliEnvelope<TData> {
-    schemaVersion: 1;
-    command: string;                  // "check" | "analyze" | "model" | "diff" | …
-    ok: boolean;                      // exitCode === 0
-    exitCode: 0 | 1 | 2;              // 0 clean, 1 violations, 2 tool error
-    data: TData;                      // see per-command data shapes below
-    diagnostics: readonly Diagnostic[]; // warnings/info; closed `DiagnosticKind` taxonomy
-    meta: {
-      aactVersion: string;
-      durationMs: number;
-      configPath: string | null;      // c12-resolved aact.config.ts (absolute)
-      source: string | null;          // resolved source.path (absolute)
-    };
-  }
-  ```
-
-  Per-command `data` (each is exported from the public API):
-  - `aact check` → `CheckData` — `violations[]` (each with
-    `rule`, `target`, `targetKind`, `message`, `severity`,
-    optional `sourceLocation` + `relatedLocations[]`),
-    `suggestedFixes[]`, `summary`, `rules[]` (the rule catalogue
-    so agents don't need a separate `rule list` call), optional
-    `fixesApplied` when `--fix` was used.
-  - `aact analyze` → `AnalyzeData` — `elementsByKind`,
-    `relationsByStyle` (sync/async/unspecified), per-boundary
-    `cohesion` / `syncCoupling` / `asyncCoupling` /
-    `unspecifiedCoupling` / `ratio` / `couplingRelations[]`,
-    `fanIn` / `fanOut` top-N hotspots, `cycles` (count + smallest).
-  - `aact model` → `ModelData` — the full normalised graph
-    (`elements`, `boundaries`, `rootBoundaryNames`, optional
-    `workspace`) plus loader `issues[]`. Use this to confirm the
-    parser sees what you intended.
-  - `aact diff` → `DiffData` — `summary.headline` (one-line
-    reasoning seed), `summary.bySeverity`, sorted `changes[]`
-    (entity-tagged element/boundary/relation/workspace with
-    `action: added | removed | modified | renamed | moved`,
-    severity, per-field deltas, optional `confidence` on
-    renames), `baseline` / `current` provenance, optional
-    `patch` (RFC 6902) when `--with-patch` was set.
-  - `aact rule list` → `RuleListData` — `rules[]` with
-    `source` (built-in / custom), `enabled`, `hasFix`, optional
-    `helpUri` (the rule's ADR blob URL when one exists).
-  - `aact rule explain <name>` → `RuleExplainData` — same metadata
-    plus `rationale`, `examples` (good/bad pairs), `adrPath`.
-  - `aact generate` → `GenerateData` — `formatName`,
-    `outputSink` (`stdout | file | directory | none`),
-    `outputPath`, list of generated files with sizes.
-  - `aact init` → `InitData` — created / skipped file paths.
-  - `aact skill install` → `SkillData` — install plans per target,
-    with `action` (`installed | updated | reinstalled`) and the
-    final `skillDir` for each.
-
-  Exit codes are part of the contract: `0` clean, `1`
-  domain-unhappy (violations exist, structural diff has changes
-  in `--strict` mode), `2` tool error (config invalid, source
-  missing, parse failed). Agents must branch on these — do not
-  collapse them.
-- **`--sarif`** (on `check` / `model`) — SARIF v2.1.0 with the
-  canonical `$schema` URL and `tool.driver.name: "aact"`. Upload
-  directly to GitHub Code Scanning, SonarQube, or any SARIF
-  consumer — no custom converter needed.
-- **GitHub Actions annotations** on `check` auto-enable when
-  `GITHUB_ACTIONS=true` is set. The `::error file=...,line=...,col=...,title=...::<message>`
-  lines anchor to the violation's `sourceLocation`, so the runner
-  surfaces them as inline PR comments.
+For exact JSON envelope shapes, SARIF notes, and per-command data
+contracts, load `references/CLI output.md` only when the user needs
+machine-readable output details.
 
 ## Maintaining the skill
 
 - **`scripts/sync-from-aact.sh`** — pulls the latest ADRs and patterns catalog from `Byndyusoft/aact` into `references/`. Run after upstream releases that add or change ADRs. Pass a tag (`bash scripts/sync-from-aact.sh v2.1.5`) to pin to a specific release.
 - **`evals/evals.json`** — 20 trigger-rate test queries (10 should-trigger / 10 should-not-trigger) for optimizing the `description` field. Run with the `skill-creator` skill from `anthropics/skills`, or any harness that follows the [optimizing-descriptions](https://agentskills.io/skill-creation/optimizing-descriptions) recipe.
+- **`evals/acceptance.json`** — output-quality acceptance cases for guided bootstrap, existing-project review, explanation-only, custom rules, and near-miss prompts. Use these before changing workflow instructions so improvements are measured against expected behavior, not vibes.

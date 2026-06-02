@@ -141,6 +141,12 @@ new boundary). Better no fix than a wrong fix.
 
 `aact.config.ts` registers the rules and configures their options:
 
+Registration uses runtime imports from `aact`. If the project does not
+already have `aact` as a local devDependency, ask before installing it
+and before switching `aact.config.ts` from the type-only template to
+`defineConfig`. Until the user approves the install, describe the rule
+and planned patch, but do not run a package manager.
+
 ```ts
 import { defineConfig } from "aact";
 import { myRule } from "./rules/myRule";
@@ -229,7 +235,7 @@ describe("myRule", () => {
 
 ## Listing the effective rule set
 
-`npx aact@beta rule list` prints all enabled rules with source labels
+`npx --yes aact@beta rule list` prints all enabled rules with source labels
 (built-in / custom) and enabled state. Add `--json` for tooling
 integration. Useful when:
 

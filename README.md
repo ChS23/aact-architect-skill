@@ -13,15 +13,16 @@ The skill keeps **all reasoning about patterns and ADRs in markdown** (loaded on
 - `references/Writing custom rules.md` — how to author project-specific rules.
 - An ADR template ready to fill.
 - Starter `architecture.puml` (C4-PlantUML) and `workspace.dsl` (Structurizr) stubs, plus the canonical Internet Banking System example at all three C4 levels (`example-1-system-context.puml` / `example-2-container.puml` / `example-3-component.puml`), in `assets/`.
-- `scripts/verify.sh` — thin wrapper around `npx aact@beta check` with friendly errors.
+- `scripts/verify.sh` — thin wrapper around `npx --yes aact@beta check` with friendly errors.
 - `scripts/sync-from-aact.sh` — pulls fresh ADRs/patterns from upstream.
 - `evals/evals.json` — 20 trigger-rate queries (10 should-trigger / 10 should-not-trigger) for `description` optimization.
+- `evals/acceptance.json` — output-quality use cases for guided bootstrap, existing-project review, explanation-only, custom rules, and near-miss prompts.
 
 ## Compatibility
 
 Agent Skills format. Tested-as-loaded in Claude Code. Per [agentskills.io clients](https://agentskills.io/clients), the same format works in OpenAI Codex CLI, Cursor, GitHub Copilot, VS Code, Goose, OpenCode, Junie, and ~30 other agents.
 
-Runtime: requires Node.js ≥ 22 (for `npx aact@beta`).
+Runtime: requires Node.js ≥ 22 (for `npx --yes aact@beta`).
 
 ## Install
 
@@ -50,9 +51,18 @@ cd /tmp/some-fresh-dir
 #   "I have an architecture.puml — can you review it?"
 ```
 
-The skill should activate. It'll copy a stub from `assets/`, walk you through the system, and run `scripts/verify.sh` (which forwards to `npx aact@beta check`).
+The skill should activate. In an empty project it runs `npx --yes aact@beta init`, explains the generated files, edits `architecture.puml`, and runs `scripts/verify.sh` (which forwards to `npx --yes aact@beta check`). In an existing aact project it reviews the current files without rerunning `init`.
 
 ## Validate the skill
+
+Fast local gate:
+
+```bash
+bash scripts/acceptance-static.sh
+```
+
+Behavioral approval cases live in `evals/acceptance.json`; the recommended
+workflow is documented in `evals/README.md`.
 
 Validator from [agentskills/agentskills](https://github.com/agentskills/agentskills):
 
