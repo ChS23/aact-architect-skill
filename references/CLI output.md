@@ -34,10 +34,13 @@ interface CliEnvelope<TData> {
 
 ## Per-command data
 
-- `aact check` → `CheckData` — `violations[]` (each with `rule`,
-  `target`, `targetKind`, `message`, `severity`, optional
-  `sourceLocation` + `relatedLocations[]`), `suggestedFixes[]`,
-  `summary`, `rules[]`, optional `fixesApplied` when `--fix` was used.
+- `aact check` → `CheckData` — `violations[]` (each with `ruleId`,
+  `target`, `targetKind`, `message`, `severity` (`"error" | "warning" |
+  "info"`), optional `sourceLocation` + `relatedLocations[]`),
+  `suggestedFixes[]`, `summary` (`{ passed, failed, violations }` —
+  `passed`/`failed` count rules, `violations` counts findings), `rules[]`
+  (each a `RuleMetadata`: `ruleId`, `description`, `source`, `enabled`,
+  `hasFix`, optional `helpUri`), optional `fixesApplied` when `--fix` ran.
 - `aact analyze` → `AnalyzeData` — `elementsByKind`,
   `relationsByStyle`, per-boundary cohesion/coupling numbers,
   `couplingRelations[]`, `fanIn`, `fanOut`, and cycles.

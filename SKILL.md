@@ -1,8 +1,8 @@
 ---
 name: aact-architect
-description: Design, review, measure, and generate microservice architectures using the aact pattern catalog and CLI. Use this skill whenever the user sketches or reviews a C4 / microservice architecture, asks for PlantUML or Structurizr architecture-as-code, writes an ADR, asks why an aact rule fired, chooses tags (acl, repo, relay), creates custom rules, measures coupling/cohesion, or generates Kubernetes/PlantUML from the model — even if they do not mention "aact" or "C4". In an empty project, immediately guide them by running `npx --yes aact@beta init`, then edit `architecture.puml` and run `aact check`; do not leave vibe-coding users with prose only.
+description: Design, review, measure, and generate microservice architectures using the aact pattern catalog and CLI. Use this skill whenever the user sketches or reviews a C4 / microservice architecture, asks for PlantUML or Structurizr architecture-as-code, writes an ADR, asks why an aact rule fired, chooses tags (acl, repo, relay), creates custom rules, measures coupling/cohesion, generates Kubernetes/PlantUML from the model, or checks whether a deployed Kubernetes cluster still matches the architecture (drift) — even if they do not mention "aact" or "C4". In an empty project, immediately guide them by running `npx --yes aact@beta init`, then edit `architecture.puml` and run `aact check`; do not leave vibe-coding users with prose only.
 license: GPL-3.0 (skill code and bundled ADRs derive from Byndyusoft/aact, GPL-3.0)
-compatibility: Requires Node.js >= 22. The skill uses `aact@beta` via `npx --yes` so it tracks the current v3 beta dist-tag instead of pinning a concrete beta version. v3 brings typed Model API, `customRules` extension, `defineConfig` generics with autocomplete for custom rule options, and the `aact rule list` command — all backward-compatible at the PlantUML / Structurizr source level.
+compatibility: Requires Node.js >= 22. The skill uses `aact@beta` via `npx --yes` so it tracks the current v3 beta dist-tag instead of pinning a concrete beta version. v3 brings a typed Model API, `customRules` + `defineConfig` generics with autocomplete, the `aact rule list` command, a positional source for `check` / `model` / `analyze`, Kubernetes / Compose as load formats (conformance), and real `kubectl apply`-able Kubernetes generate — all backward-compatible at the PlantUML / Structurizr source level.
 metadata:
   author: Sergei Volchkov (https://github.com/ChS23)
   upstream: https://github.com/Byndyusoft/aact
@@ -190,12 +190,19 @@ principle from the row and say that the rule has no bundled ADR yet.
 
 When the user asks "what's our coupling?", "is this boundary cohesive enough?", or wants numbers to bring to a review:
 
-1. Run `npx --yes aact@beta analyze` from the project root. For machine-readable output (e.g. to diff between two versions), use `--json`.
+1. Run `npx --yes aact@beta analyze`. `analyze`, `check`, and `model` take a
+   **source positionally** now (`aact analyze <path>`), so you can point at a
+   file or a `./k8s/` directory without a config. For machine-readable output
+   (e.g. to diff between two versions), use `--json`.
 2. The report includes:
-   - `elementsCount` — total containers in the model.
-   - `syncApiCalls`, `asyncApiCalls` — count of REST vs async edges.
-   - `databases.count` / `databases.consumes` — DB inventory + how many services touch them.
-   - `boundaries[]` — per boundary, its `cohesion` (intra-boundary relations) and `coupling` (cross-boundary outgoing relations), plus `couplingRelations[]` listing which specific edges leak across the boundary.
+   - `elementsCount` / `elementsByKind` — model inventory by kind.
+   - `relationsByStyle` — `{ sync, async, unspecified }` edge counts (classified
+     by tag first, then by the `analyze.{sync,async}Technologies` lists).
+   - `databases.count` — DB inventory + how many relations consume them.
+   - `boundaries[]` — per boundary, its `cohesion` (intra-boundary relations) and
+     `coupling` (cross-boundary outgoing), plus `couplingRelations[]` listing the
+     specific edges that leak across the boundary.
+   - `fanIn` / `fanOut` — top-N afferent / efferent coupling hotspots.
 3. Translate numbers into stakeholder language: rising coupling between two boundaries usually signals a missing seam (an ACL or API Gateway); cohesion below coupling on a boundary signals that the boundary is wrongly drawn — its contents probably belong to two different domains.
 4. Anchor every finding in the `Cohesion > Coupling` pattern (`references/patterns-catalog.md`) so the user understands *why* a number matters, not just *that* it's bigger than another.
 
@@ -209,16 +216,28 @@ npx --yes aact@beta generate --format plantuml --output ./diagrams/architecture.
 ```
 The boundary heading label in the output is configurable via `generate.boundaryLabel` in `aact.config.ts`.
 
-**Kubernetes** — emit one YAML stub per deployable container with environment-variable scaffolding for DB connections, REST `*_BASE_URL`, and Kafka topics (`KAFKA_<TARGET>_TOPIC` for `async`-tagged relations). Output is a directory of `.yml` files.
+**Kubernetes** — emit **real, `kubectl apply`-able manifests** under the current
+stable API (`apps/v1` Deployment / StatefulSet, `v1` Service / Namespace): one
+file per deployable element (workload + its Service), a `namespaces.yaml` for the
+boundaries, relations wired as env-var Service references. Output is a directory
+of `.yaml` files.
 ```bash
 npx --yes aact@beta generate --format kubernetes --output ./k8s
 ```
-Default output directory if `--output` is omitted: `resources/kubernetes/microservices` (configurable via `generate.kubernetes.path` in `aact.config.ts`).
+Default output directory if `--output` is omitted: `fixtures/kubernetes/microservices` (configurable via `generate.kubernetes.path` in `aact.config.ts`).
 
 Things to tell the user before they run it:
-- Only `Container`-typed elements become deployment YAMLs. `System`, `Component`, `Person`, `ContainerDb`, and external systems are deliberately skipped — these are not deployable units.
-- The output is a **scaffold**, not production manifests. Image tags, resource requests, replicas, and secrets are not generated — the team fills them in.
-- The DB connection template defaults to PostgreSQL (`postgresql://{name}:pass-{name}@postgresql:5432/{name}`) and the service port to 8080. Both are CLI-fixed today — overriding them requires using the `generateKubernetes(model, options)` library API directly, not `aact.config.ts`.
+- Deployable elements become workloads: `Container` → `Deployment`, `ContainerDb`
+  / `ContainerQueue` → `StatefulSet`. `System`, `Component`, `Person`, and
+  external elements are skipped — they're not deployable units.
+- It **round-trips**: `aact.*` annotations preserve kind / technology / tags /
+  name, so `generate` → `load` reproduces the model. That makes the output a
+  valid drift baseline (see "Conformance" below), not a throwaway.
+- It's still a **scaffold**, not a deployment source of truth: the C4 model has no
+  resources, probes, secrets, or ingress — the team fills those in via Helm /
+  Kustomize. DB connection strings use `dbConnectionTemplate`
+  (`postgresql://app:secret@{service}:5432/{db}` by default; `{service}` / `{db}`
+  substituted), container port via `defaultPort` (8080).
 
 ### G. Writing project-specific (custom) rules
 
@@ -308,6 +327,24 @@ When the built-in catalogue does not match a project's conventions — bounded-c
 
 Read `references/Writing custom rules.md` for the full pattern guide (when to write, anatomy, registration, options inference, fix capability, testing).
 
+### H. Conformance — architecture vs the deployed cluster
+
+`kubernetes` and `compose` are **load** formats too, not just generate targets:
+aact reads real manifests (workload kinds → Container, `image` → kind, namespace
+→ Boundary, env-vars + `Service` selectors → relations, `aact.*` annotations as
+overrides) into the same C4 Model. So you can check whether the deployment still
+matches the intended architecture:
+
+```bash
+npx --yes aact@beta diff architecture.dsl ./k8s/   # drift between schema and cluster
+npx --yes aact@beta check ./k8s/                   # lint the cluster itself
+```
+
+A directory argument auto-detects as `kubernetes`. `diff` surfaces missing /
+extra workloads, rewired or direct relations, and technology swaps; exit `1`
+makes it a CI drift gate. Use this when the user asks "does what's deployed still
+match our design?".
+
 ## Rule → reference map
 
 | Rule | What it checks | Reference |
@@ -328,7 +365,7 @@ These tags are how aact knows what each container is. Get them right and the rul
 
 - **`acl`** — service that wraps an external integration. Without this tag, anything connecting to a `System_Ext` will trip the `acl` rule.
 - **`repo`** or **`relay`** — service whose only job is to own a database. Without this tag, anything connecting to a `ContainerDb` will trip the `crud` rule. Repos must not have non-DB dependencies.
-- **`async`** (on a relation, not a container) — marks an asynchronous edge (Kafka, queue). The Kubernetes generator emits `KAFKA_*_TOPIC` env vars for these instead of `*_BASE_URL`.
+- **`async`** (on a relation, not a container) — marks an asynchronous edge (Kafka, queue). `aact analyze` classifies it under `relationsByStyle.async`; the Structurizr loader also sets it from `!interactionStyle Asynchronous`.
 - **API Gateway routing** is detected on the relation technology, not
   by adding a special gateway container. For an ACL calling an external
   REST/HTTPS system, write the edge like
@@ -379,8 +416,15 @@ C4 modeling — the three mistakes that produce plausible-but-wrong models (full
 
 aact / tooling specifics:
 
-- `Stdlib_C4_Context` element type in PlantUML is `System` — those become `SYSTEM_TYPE` containers in the model. The Kubernetes generator whitelists `Container` only, so `System`, `Component`, `Person` and external systems are deliberately skipped — do not expect them in the YAML output.
-- `enrichTags` in the Structurizr loader is a naming heuristic: a container whose name contains "crud" gets a phantom `repo` tag automatically. If the user names a service `crud_processor` for unrelated reasons, override the inferred tag explicitly in their workspace.
+- The Kubernetes generator emits workloads only for `Container` / `ContainerDb`
+  / `ContainerQueue`; `System`, `Component`, `Person`, and external elements are
+  skipped — they're not deployable, so don't expect them in the YAML.
+- Role detection is by **tag OR name pattern**, not a hidden "crud → repo"
+  heuristic (that v2 `enrichTags` behavior was removed). A container matching
+  `crud.repoNamePatterns` (default `*_{repo,repository,storage,dao,store}`,
+  case-insensitive) counts as a repo even without the `repo` tag — likewise
+  `acl.aclNamePatterns`. Override the lists per-project, or tag explicitly if a
+  name collides by accident.
 - `apiGateway` checks only ACL → external relations, and the default
   pattern is `/gateway/i` against `Rel(..., technology)`. Prefer
   `HTTPS via API Gateway` over inventing a fake internal gateway box.
@@ -406,11 +450,11 @@ bash scripts/verify.sh --dry-run # preview fixes without writing
 | Command | Purpose | Common flags |
 |---------|---------|--------------|
 | `aact init` | Scaffold `aact.config.ts` + starter `architecture.puml`. | (no flags) |
-| `aact check` | Run all enabled rules against the source. | `--fix`, `--dry-run`, `--json`, `--sarif`, `--config <path>` |
-| `aact analyze` | Print coupling/cohesion metrics (workflow E). | `--json`, `--config <path>` |
-| `aact model` | Print the normalised Model — the same graph the rules see. Use for parser-debugging (e.g. confirming a `softwareSystem` boundary really contains the containers you expect after a `group` rewrite). | `--json` for the full graph, `--sarif` for loader-level issues, `--config <path>` |
-| `aact diff <baseline> [<current>]` | Structural diff between two architecture models — `architecture.puml` vs `architecture.puml`, `HEAD:architecture.puml` vs working tree, snapshot `*.aact.json` vs current. Detects renames by similarity, collapses pure technology swaps into one `modified` change, optionally emits an RFC 6902 patch. Built for PR review. | `--rename-threshold 0..1`, `--no-rename-detection`, `--with-patch`, `--baseline-format / --current-format`, `--json`, `--config <path>` |
-| `aact generate` | Emit PlantUML, Kubernetes, or canonical `model-json` from the model (workflow F). | `--format plantuml\|kubernetes\|model-json`, `--output <path>`, `--json`, `--config <path>` |
+| `aact check [<source>]` | Run all enabled rules against the source (positional path overrides / replaces config). | `--fix`, `--dry-run`, `--json`, `--sarif`, `--config <path>` |
+| `aact analyze [<source>]` | Print coupling/cohesion metrics (workflow E). Takes a positional source. | `--json`, `--config <path>` |
+| `aact model [<source>]` | Print the normalised Model — the same graph the rules see. Takes a positional source; use for parser-debugging (e.g. confirming a `softwareSystem` boundary contains the containers you expect after a `group` rewrite), or to inspect what a `./k8s/` directory loads as. | `--json` for the full graph, `--sarif` for loader-level issues, `--config <path>` |
+| `aact diff <baseline> [<current>]` | Structural diff between two models — `architecture.puml` vs `architecture.puml`, `HEAD:architecture.puml` vs working tree, snapshot `*.aact.json`, or a `./k8s/` directory (drift vs the deployed cluster, workflow H). Detects renames by similarity, collapses pure technology swaps into one `modified` change, optionally emits an RFC 6902 patch. Built for PR review and conformance. | `--rename-threshold 0..1`, `--no-rename-detection`, `--with-patch`, `--baseline-format / --current-format`, `--json`, `--config <path>` |
+| `aact generate` | Emit PlantUML, Structurizr DSL, real Kubernetes manifests, Compose, or canonical `model-json` from the model (workflow F). | `--format plantuml\|structurizr\|kubernetes\|compose\|model-json`, `--output <path>`, `--json`, `--config <path>` |
 | `aact rule list` | List the effective rule set (built-in + custom, enabled state). | `--json` |
 | `aact rule explain <name>` | Show a rule's rationale, good/bad examples, and the ADR it derives from. Use when the user asks "why did this fire?". | `--json` |
 | `aact skill install` | (Re)install this skill from the upstream `aact-architect-skill` repo. Picks up new SKILL.md / references / ADRs without manual `git pull`. Targets one or more clients: `--claude`, `--codex`, `--cursor`, `--copilot`, `--cline`, `--all`. `--dry-run` previews the writes. | `--force` overwrites an unmanaged directory |
