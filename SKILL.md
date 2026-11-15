@@ -1,8 +1,8 @@
 ---
 name: aact-architect
-description: Design, review, measure, and generate microservice architectures using the aact pattern catalog and CLI. Use this skill whenever the user sketches or reviews a C4 / microservice architecture, asks for PlantUML or Structurizr architecture-as-code, writes an ADR, asks why an aact rule fired, chooses tags (acl, repo, relay), creates custom rules, measures coupling/cohesion, generates Kubernetes/PlantUML from the model, or checks whether a deployed Kubernetes cluster still matches the architecture (drift) — even if they do not mention "aact" or "C4". In an empty project, immediately guide them by running `npx --yes aact@beta init`, then edit `architecture.puml` and run `aact check`; do not leave vibe-coding users with prose only.
+description: Design, review, measure, and generate microservice architectures using the aact pattern catalog and CLI. Use this skill whenever the user sketches or reviews a C4 / microservice architecture, asks for PlantUML or Structurizr architecture-as-code, writes an ADR, asks why an aact rule fired, chooses tags (acl, repo, relay), creates custom rules, measures coupling/cohesion, generates Kubernetes/PlantUML from the model, or checks whether a deployed Kubernetes cluster still matches the architecture (drift) — even if they do not mention "aact" or "C4". In an empty project, immediately guide them by running `npx --yes aact@latest init`, then edit `architecture.puml` and run `aact check`; do not leave vibe-coding users with prose only.
 license: GPL-3.0 (skill code and bundled ADRs derive from Byndyusoft/aact, GPL-3.0)
-compatibility: Requires Node.js >= 22. The skill uses `aact@beta` via `npx --yes` so it tracks the current v3 beta dist-tag instead of pinning a concrete beta version. v3 brings a typed Model API, `customRules` + `defineConfig` generics with autocomplete, the `aact rule list` command, a positional source for `check` / `model` / `analyze`, Kubernetes / Compose as load formats (conformance), and real `kubectl apply`-able Kubernetes generate — all backward-compatible at the PlantUML / Structurizr source level.
+compatibility: Requires Node.js >= 22. The skill uses `aact@latest` via `npx --yes` so it always runs the current stable v3 release — `@latest` makes npx re-resolve the tag instead of reusing an older cached aact. v3 brings a typed Model API, `customRules` + `defineConfig` generics with autocomplete, the `aact rule list` command, a positional source for `check` / `model` / `analyze`, Kubernetes / Compose as load formats (conformance), and real `kubectl apply`-able Kubernetes generate — all backward-compatible at the PlantUML / Structurizr source level.
 metadata:
   author: Sergei Volchkov (https://github.com/ChS23)
   upstream: https://github.com/Byndyusoft/aact
@@ -21,8 +21,8 @@ Use this before reading optional references:
 
 1. If the user asks to design, sketch, validate, analyze, or generate an
    architecture and the directory has no `aact.config.*` or architecture
-   source, run `npx --yes aact@beta init` immediately. Then explain the
-   two files, edit `architecture.puml`, and run `npx --yes aact@beta check`.
+   source, run `npx --yes aact@latest init` immediately. Then explain the
+   two files, edit `architecture.puml`, and run `npx --yes aact@latest check`.
 2. If `aact.config.*` or an architecture source already exists, do not
    run `init`. Inspect the existing files and run the relevant command.
 3. If the user only asks a conceptual question or an ADR draft, do not
@@ -51,7 +51,7 @@ or generate architecture artifacts and the working directory has no
 `aact.config.*` and no architecture source (`architecture.puml`,
 `workspace.dsl`, `workspace.json`, or `*.aact.json`).
 
-1. Run `npx --yes aact@beta init` automatically.
+1. Run `npx --yes aact@latest init` automatically.
    This must be the next command after confirming the directory is an
    empty architecture project. Do not read references, copy assets, or
    draft the diagram first — bootstrap creates the working surface.
@@ -62,7 +62,7 @@ or generate architecture artifacts and the working directory has no
    description. Ask only the missing questions needed for the next C4
    decision: system name, users, external systems, runnable units, data
    stores, and relations.
-4. Run `npx --yes aact@beta check` once the model has shape.
+4. Run `npx --yes aact@latest check` once the model has shape.
 5. Explain violations in plain language and propose the next edit.
 
 `aact init` is non-destructive: existing `aact.config.ts` and
@@ -110,7 +110,7 @@ or switching imports:
 
 > Custom rules need `aact` as a local devDependency so `defineConfig`
 > and `defineRule` can be imported at runtime. Should I install it now
-> with `<detected package manager> add -D aact@beta` and then patch the
+> with `<detected package manager> add -D aact@latest` and then patch the
 > config?
 
 If you need to edit the config (e.g. add a `source` override), patch the
@@ -125,7 +125,7 @@ existing file line by line — never overwrite it from scratch.
 3. In an existing project, patch the current `architecture.puml`, `workspace.dsl`, or `workspace.json` in place. Only use `assets/architecture-stub.puml` / `assets/workspace-stub.dsl` when the user explicitly asks for a standalone example or cannot run the CLI.
 4. **Before adding elements, get the C4 discipline right.** Read `references/C4 model.md` only when you need modeling guidance beyond the fast path — it has the canonical definitions, a decision procedure for "is this a Container?", and the failure modes that produce plausible-but-wrong models (layers-as-containers, over-decomposition, one shared DB box, external systems modelled as internal). The worked examples in `assets/example-1-system-context.puml` / `example-2-container.puml` / `example-3-component.puml` show correct granularity at each level.
 5. Walk the user through their system, adding containers one by one — follow the minimum-viable-C4 procedure in `references/C4 model.md`. Apply the tagging conventions in the [Tagging cheat sheet](#tagging-cheat-sheet) below.
-6. Once the diagram has shape, run `scripts/verify.sh` (or `npx --yes aact@beta check` directly) from the working directory.
+6. Once the diagram has shape, run `scripts/verify.sh` (or `npx --yes aact@latest check` directly) from the working directory.
 7. Walk through any violations using [Interpreting violations](#interpreting-violations).
 
 ### B. Writing an ADR
@@ -168,9 +168,9 @@ existing file line by line — never overwrite it from scratch.
 
 ### C. Reviewing an existing architecture
 
-1. If no architecture files exist, switch to [guided bootstrap](#guided-bootstrap-for-empty-projects) instead of pretending there is something to review. Otherwise run `scripts/verify.sh` from the project root. The script forwards to `npx --yes aact@beta check`.
+1. If no architecture files exist, switch to [guided bootstrap](#guided-bootstrap-for-empty-projects) instead of pretending there is something to review. Otherwise run `scripts/verify.sh` from the project root. The script forwards to `npx --yes aact@latest check`.
 2. For each rule that fired, open the matching reference (see table below) and explain to the user **why** the pattern matters, not just **what** the rule said.
-3. If the user wants the auto-fix, run `npx --yes aact@beta check --fix`. Show the diff. Do not blindly apply — confirm with the user that the fix matches their intent.
+3. If the user wants the auto-fix, run `npx --yes aact@latest check --fix`. Show the diff. Do not blindly apply — confirm with the user that the fix matches their intent.
 
 ### D. Explaining a specific rule
 
@@ -178,7 +178,7 @@ User asks "what does crud mean" or "why did acl fire". This is
 explanation-only unless the user also asks you to edit files, so do not
 bootstrap a project just to answer.
 
-Prefer `npx --yes aact@beta rule explain <name> --json` when you are already
+Prefer `npx --yes aact@latest rule explain <name> --json` when you are already
 working in an aact project or can run the CLI without creating files.
 Otherwise open the matching ADR/reference, summarise the *purpose* in
 one sentence, and cite the relevant clause when the reference actually
@@ -190,7 +190,7 @@ principle from the row and say that the rule has no bundled ADR yet.
 
 When the user asks "what's our coupling?", "is this boundary cohesive enough?", or wants numbers to bring to a review:
 
-1. Run `npx --yes aact@beta analyze`. `analyze`, `check`, and `model` take a
+1. Run `npx --yes aact@latest analyze`. `analyze`, `check`, and `model` take a
    **source positionally** now (`aact analyze <path>`), so you can point at a
    file or a `./k8s/` directory without a config. For machine-readable output
    (e.g. to diff between two versions), use `--json`.
@@ -212,7 +212,7 @@ When the user asks "what's our coupling?", "is this boundary cohesive enough?", 
 
 **Plantuml** — emit a `.puml` from any source (Structurizr → PlantUML is a common need: the team works in Structurizr, but the wiki / handout expects PlantUML). Without `--output` the result is printed to stdout.
 ```bash
-npx --yes aact@beta generate --format plantuml --output ./diagrams/architecture.puml
+npx --yes aact@latest generate --format plantuml --output ./diagrams/architecture.puml
 ```
 The boundary heading label in the output is configurable via `generate.boundaryLabel` in `aact.config.ts`.
 
@@ -222,7 +222,7 @@ file per deployable element (workload + its Service), a `namespaces.yaml` for th
 boundaries, relations wired as env-var Service references. Output is a directory
 of `.yaml` files.
 ```bash
-npx --yes aact@beta generate --format kubernetes --output ./k8s
+npx --yes aact@latest generate --format kubernetes --output ./k8s
 ```
 Default output directory if `--output` is omitted: `fixtures/kubernetes/microservices` (configurable via `generate.kubernetes.path` in `aact.config.ts`).
 
@@ -270,7 +270,7 @@ When the built-in catalogue does not match a project's conventions — bounded-c
 3. **Register + configure in `aact.config.ts`.** Custom rules require `aact` at runtime, so first check whether aact is installed locally. If it is missing, do **not** install it automatically. Ask the user for permission with the package-manager command you intend to run:
 
    ```bash
-   pnpm add -D aact@beta   # or: npm i -D aact@beta / yarn add -D aact@beta
+   pnpm add -D aact@latest   # or: npm i -D aact@latest / yarn add -D aact@latest
    ```
 
    Until the user approves, you can explain the planned rule and the
@@ -323,7 +323,7 @@ When the built-in catalogue does not match a project's conventions — bounded-c
    target node's declaration line — so a minimal `{ target,
    targetKind, message }` violation still gets a clickable link for
    free.
-7. **List the effective set** any time with `npx --yes aact@beta rule list` — built-in + custom together with enabled state. Use `--json` for tooling.
+7. **List the effective set** any time with `npx --yes aact@latest rule list` — built-in + custom together with enabled state. Use `--json` for tooling.
 
 Read `references/Writing custom rules.md` for the full pattern guide (when to write, anatomy, registration, options inference, fix capability, testing).
 
@@ -336,8 +336,8 @@ overrides) into the same C4 Model. So you can check whether the deployment still
 matches the intended architecture:
 
 ```bash
-npx --yes aact@beta diff architecture.dsl ./k8s/   # drift between schema and cluster
-npx --yes aact@beta check ./k8s/                   # lint the cluster itself
+npx --yes aact@latest diff architecture.dsl ./k8s/   # drift between schema and cluster
+npx --yes aact@latest check ./k8s/                   # lint the cluster itself
 ```
 
 A directory argument auto-detects as `kubernetes`. `diff` surfaces missing /
@@ -433,10 +433,10 @@ aact / tooling specifics:
 
 ## Verifying
 
-Run `scripts/verify.sh` from the project root. It is a thin wrapper around `npx --yes aact@beta check` that:
+Run `scripts/verify.sh` from the project root. It is a thin wrapper around `npx --yes aact@latest check` that:
 - Uses the project's `aact.config.ts` if present.
 - Fails with a clear message if config is missing; for empty projects,
-  run `npx --yes aact@beta init` first via guided bootstrap.
+  run `npx --yes aact@latest init` first via guided bootstrap.
 - Relays exit code so it can be used in CI.
 
 ```bash

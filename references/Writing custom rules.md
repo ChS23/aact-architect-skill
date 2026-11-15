@@ -235,7 +235,7 @@ describe("myRule", () => {
 
 ## Listing the effective rule set
 
-`npx --yes aact@beta rule list` prints all enabled rules with source labels
+`npx --yes aact@latest rule list` prints all enabled rules with source labels
 (built-in / custom) and enabled state. Add `--json` for tooling
 integration. Useful when:
 

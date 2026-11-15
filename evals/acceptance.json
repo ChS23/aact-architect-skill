@@ -7,11 +7,11 @@
       "prompt": "Помоги набросать C4 container diagram для checkout: orders, payments, Stripe, Postgres.",
       "setup": "Run in an empty writable directory.",
       "must": [
-        "Detect the directory is empty and run npx --yes aact@beta init.",
+        "Detect the directory is empty and run npx --yes aact@latest init.",
         "Explain that aact.config.ts configures source/rules and architecture.puml is the editable C4 model.",
         "Replace the starter architecture with a checkout model based on the user's domain.",
         "For ACL calls to external REST/HTTPS systems, put API Gateway in the relation technology, e.g. HTTPS via API Gateway.",
-        "Run or attempt npx --yes aact@beta check after the model has shape.",
+        "Run or attempt npx --yes aact@latest check after the model has shape.",
         "Explain any violations in plain language and propose the next edit."
       ],
       "must_not": [
@@ -40,7 +40,7 @@
       "setup": "Run in a directory containing aact.config.ts and architecture.puml with a deliberate CRUD violation.",
       "must": [
         "Use the existing files and do not rerun init.",
-        "Run scripts/verify.sh or npx --yes aact@beta check.",
+        "Run scripts/verify.sh or npx --yes aact@latest check.",
         "Explain each violation through the rule purpose and domain impact.",
         "Suggest fixes without overwriting the user's architecture."
       ],
@@ -69,7 +69,7 @@
       "prompt": "что означает crud rule и зачем repo service?",
       "setup": "Run in an empty directory.",
       "must": [
-        "Answer without running npx --yes aact@beta init.",
+        "Answer without running npx --yes aact@latest init.",
         "Explain the rule purpose in plain language.",
         "Give a small example of direct DB access vs repo-mediated access."
       ],
@@ -114,8 +114,8 @@
       "prompt": "посчитай coupling/cohesion и сгенерируй Kubernetes scaffold",
       "setup": "Run in an existing aact project.",
       "must": [
-        "Use npx --yes aact@beta analyze --json for metrics.",
-        "Use npx --yes aact@beta generate --format kubernetes for scaffold generation.",
+        "Use npx --yes aact@latest analyze --json for metrics.",
+        "Use npx --yes aact@latest generate --format kubernetes for scaffold generation.",
         "Explain that generated Kubernetes YAML is a scaffold, not production manifests."
       ],
       "must_not": [
@@ -132,7 +132,7 @@
         "Avoid aact/C4 workflow unless the user explicitly asks for architecture validation."
       ],
       "must_not": [
-        "Run npx --yes aact@beta init.",
+        "Run npx --yes aact@latest init.",
         "Create architecture.puml.",
         "Explain microservice architecture patterns when the user asked for a Dockerfile."
       ]

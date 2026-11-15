@@ -12,7 +12,7 @@ bash scripts/acceptance-static.sh
 ```
 
 This checks JSON fixtures, key instruction invariants, the verify wrapper,
-and that the bundled PlantUML stub passes `npx --yes aact@beta check`.
+and that the bundled PlantUML stub passes `npx --yes aact@latest check`.
 
 ## Live Smoke Gate
 

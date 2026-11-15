@@ -78,13 +78,13 @@ const mustInclude = [
   ["SKILL.md", "Guided bootstrap for empty projects"],
   ["SKILL.md", "Existing project mode"],
   ["SKILL.md", "Explanation-only / ADR-only mode"],
-  ["SKILL.md", "npx --yes aact@beta init"],
+  ["SKILL.md", "npx --yes aact@latest init"],
   ["SKILL.md", "HTTPS via API Gateway"],
   ["SKILL.md", "ask before installing"],
   ["assets/architecture-stub.puml", "HTTPS via API Gateway"],
   ["references/Target Architecture.md", "readonly elements"],
   ["references/Target Architecture.md", "schemaVersion: 1"],
-  ["scripts/verify.sh", "npx --yes aact@beta check"],
+  ["scripts/verify.sh", "npx --yes aact@latest check"],
 ];
 
 for (const [file, needle] of mustInclude) {
@@ -94,8 +94,8 @@ for (const [file, needle] of mustInclude) {
 }
 
 for (const [file, body] of Object.entries(text)) {
-  if (/\bnpx aact@beta\b/.test(body)) {
-    throw new Error(`${file} still uses interactive npx aact@beta`);
+  if (/\bnpx aact@latest\b/.test(body)) {
+    throw new Error(`${file} still uses interactive npx aact@latest`);
   }
 
   if (body.includes("Model.containers")) {
@@ -120,11 +120,11 @@ trap 'rm -rf "$TMPDIR"' EXIT
 
 (
   cd "$TMPDIR"
-  npx --yes aact@beta init >/dev/null
+  npx --yes aact@latest init >/dev/null
   cp "$ROOT/assets/architecture-stub.puml" architecture.puml
 
   set +e
-  npx --yes aact@beta check --json > result.json
+  npx --yes aact@latest check --json > result.json
   CHECK_STATUS=$?
   set -e
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Thin wrapper around `npx --yes aact@beta check` with helpful messages when prerequisites
-# are missing. Forwards extra flags to `aact@beta check` so callers can use --fix,
+# Thin wrapper around `npx --yes aact@latest check` with helpful messages when prerequisites
+# are missing. Forwards extra flags to `aact@latest check` so callers can use --fix,
 # --dry-run, --format, --config, etc.
 #
 # Usage:
@@ -23,7 +23,7 @@ fi
 
 if [ ! -f aact.config.ts ] && [ ! -f aact.config.js ] && [ ! -f aact.config.mjs ]; then
   echo "Error: aact.config.ts not found in $(pwd)." >&2
-  echo "Run \`npx --yes aact@beta init\` first — it scaffolds aact.config.ts plus a starter architecture.puml." >&2
+  echo "Run \`npx --yes aact@latest init\` first — it scaffolds aact.config.ts plus a starter architecture.puml." >&2
   exit 2
 fi
 
@@ -32,6 +32,6 @@ if ! command -v npx >/dev/null 2>&1; then
   exit 2
 fi
 
-# Track the `beta` dist-tag instead of pinning a concrete beta version. The tag
-# stays on the current v3 beta until the stable v3 cut.
-exec npx --yes aact@beta check "$@"
+# Track the `latest` dist-tag (the stable v3 line): `@latest` makes npx
+# re-resolve the tag instead of reusing an older cached aact.
+exec npx --yes aact@latest check "$@"

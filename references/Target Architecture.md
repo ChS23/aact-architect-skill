@@ -1,6 +1,6 @@
 # Целевая архитектура aact
 
-Status: актуализировано для v3 beta на 2026-05-17. Этот документ больше не
+Status: актуализировано для v3 на 2026-05-17. Этот документ больше не
 описывает "будущее без CLI": CLI, Format API, custom rules и typed Model API уже
 есть. Остальные пункты ниже фиксируют текущее состояние и ближайшую целевую
 линию: source locations, JSON diagnostics и будущий `sync` режим.
@@ -22,14 +22,14 @@ aact — OSS CLI и библиотека для проверки архитек�
 
 | Команда | Назначение |
 | --- | --- |
-| `npx --yes aact@beta init` | Создать `aact.config.ts` и starter `architecture.puml`. |
-| `npx --yes aact@beta check` | Проверить правила, exit code 1 при нарушениях. |
-| `npx --yes aact@beta check --fix` | Применить conservative auto-fixes, если формат поддерживает fix. |
-| `npx --yes aact@beta analyze` | Посчитать architecture metrics: coupling, cohesion, API calls, DB usage. |
-| `npx --yes aact@beta generate --format plantuml` | Сгенерировать PlantUML из Model. |
-| `npx --yes aact@beta generate --format kubernetes` | Сгенерировать Kubernetes scaffold из Model. |
-| `npx --yes aact@beta rule list` | Показать effective rule set: built-in + custom. |
-| `npx --yes aact@beta skill` | Установить `aact-architect` skill для агентных workflow. |
+| `npx --yes aact@latest init` | Создать `aact.config.ts` и starter `architecture.puml`. |
+| `npx --yes aact@latest check` | Проверить правила, exit code 1 при нарушениях. |
+| `npx --yes aact@latest check --fix` | Применить conservative auto-fixes, если формат поддерживает fix. |
+| `npx --yes aact@latest analyze` | Посчитать architecture metrics: coupling, cohesion, API calls, DB usage. |
+| `npx --yes aact@latest generate --format plantuml` | Сгенерировать PlantUML из Model. |
+| `npx --yes aact@latest generate --format kubernetes` | Сгенерировать Kubernetes scaffold из Model. |
+| `npx --yes aact@latest rule list` | Показать effective rule set: built-in + custom. |
+| `npx --yes aact@latest skill` | Установить `aact-architect` skill для агентных workflow. |
 
 ## Принципы
 
@@ -165,7 +165,7 @@ Custom rule policy:
 
 ## CLI output direction
 
-Current beta uses one stable JSON envelope for all `--json` commands:
+aact v3 uses one stable JSON envelope for all `--json` commands:
 
 ```bash
 aact check [--json] [--fix] [--dry-run]
@@ -221,7 +221,7 @@ sync      -> runtime/infra source + Model -> DriftReport / Patch
 Example future command:
 
 ```bash
-npx --yes aact@beta sync \
+npx --yes aact@latest sync \
   --source ./architecture.puml \
   --infra ./deploy/kubernetes \
   --json
